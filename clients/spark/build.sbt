@@ -16,6 +16,7 @@ lazy val scala212Version = "2.12.12"
 
 def settingsToCompileIn(dir: String) = {
   Seq(
+    Compile / sourceManaged := (ThisBuild / baseDirectory).value / dir / "target",
     Compile / scalaSource := (ThisBuild / baseDirectory).value / dir / "src" / "main" / "scala",
     Test / scalaSource := (ThisBuild / baseDirectory).value / dir / "src" / "test" / "scala",
     Compile / resourceDirectory := (ThisBuild / baseDirectory).value / dir / "src" / "main" / "resources",
@@ -25,8 +26,9 @@ def settingsToCompileIn(dir: String) = {
 }
 
 def generateCoreProject(buildType: BuildType) =
-  Project(s"${baseName}-client-${buildType.name}", file(s"target/core-${buildType.name}"))
+  Project(s"${baseName}-client-${buildType.name}", file("core"))
     .settings(
+      target:=file(s"target/core-${buildType.name}"),
       sharedSettings,
       settingsToCompileIn("core"),
       scalaVersion := buildType.scalaVersion,
@@ -47,8 +49,9 @@ def generateCoreProject(buildType: BuildType) =
     )
 
 def generateExamplesProject(buildType: BuildType) =
-  Project(s"${baseName}-examples-${buildType.name}", file(s"target/examples-${buildType.name}"))
+  Project(s"${baseName}-examples-${buildType.name}", file("examples"))
     .settings(
+      target:=file(s"target/examples-${buildType.name}"),
       sharedSettings,
       settingsToCompileIn("examples"),
       scalaVersion := buildType.scalaVersion,
