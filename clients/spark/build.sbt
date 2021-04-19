@@ -52,7 +52,11 @@ def generateExamplesProject(buildType: BuildType) =
       sharedSettings,
       settingsToCompileIn("examples"),
       scalaVersion := buildType.scalaVersion,
-      libraryDependencies += "org.apache.spark" %% "spark-sql" % buildType.sparkVersion % "provided",
+      libraryDependencies ++= Seq("org.apache.spark" %% "spark-sql" % buildType.sparkVersion % "provided",
+        "software.amazon.awssdk" % "bom" % "2.15.15",
+        "software.amazon.awssdk" % "s3" % "2.15.15",
+        "com.amazonaws" % "aws-java-sdk-s3" % "1.11.1000",
+      ),
       assembly / mainClass := Some("io.treeverse.examples.List"),
     )
 
