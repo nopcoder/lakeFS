@@ -4,7 +4,7 @@ on:
 
 jobs:
   nessie:
-    name: Build Docker image
+    name: Nessie tests
     runs-on: ubuntu-20.04
     steps:
       - name: Checkout
@@ -22,11 +22,11 @@ jobs:
         run: |
           make gen
       - name: Build image
-        run: docker build -t treeverse/lakefs-next --build-arg VERSION=${{ steps.version.outputs.tag }} .
+        run: docker build -t treeverse.io/lakefs --build-arg VERSION=${{ steps.version.outputs.tag }} .
       - name: Test lakeFS local
         env:
           TAG: latest
-          REPO: treeverse
+          REPO: treeverse.io
           LAKEFS_STATS_ENABLED: "false"
           LAKEFS_BLOCKSTORE_TYPE: local
           LAKEFS_GATEWAYS_S3_DOMAIN_NAME: s3.local.lakefs.io:8000
