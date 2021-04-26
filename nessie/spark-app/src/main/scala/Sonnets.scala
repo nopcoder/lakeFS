@@ -6,7 +6,7 @@ object Sonnets {
       .builder()
       .appName("SonnetsApp")
       .getOrCreate()
-    spark.sparkContext.hadoopConfiguration.set("fs.s3a.endpoint", "s3.docker.lakefs.io:8000")
+    spark.sparkContext.hadoopConfiguration.set("fs.s3a.endpoint", "s3.local.lakefs.io:8000")
     spark.sparkContext.hadoopConfiguration.set("fs.s3a.connection.ssl.enabled", "false")
     var sc = spark.sparkContext
     sc.setLogLevel("DEBUG")

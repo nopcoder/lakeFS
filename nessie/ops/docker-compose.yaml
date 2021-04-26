@@ -1,10 +1,5 @@
 version: '3'
 services:
-  #dnsmasq:
-    #image: jpillora/dnsmasq
-    #ports:
-      #- 53:53/udp
-      #- 5380:8080
   lakefs:
     image: "${REPO}/lakefs:${TAG}"
     ports:
@@ -21,7 +16,7 @@ services:
       - LAKEFS_BLOCKSTORE_LOCAL_PATH=/home/lakefs
       - LAKEFS_BLOCKSTORE_S3_CREDENTIALS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID}
       - LAKEFS_BLOCKSTORE_S3_CREDENTIALS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY}
-      - LAKEFS_GATEWAYS_S3_DOMAIN_NAME=s3.docker.lakefs.io
+      - LAKEFS_GATEWAYS_S3_DOMAIN_NAME=s3.local.lakefs.io
       - LAKEFS_LOGGING_LEVEL=DEBUG
       - LAKEFS_BLOCKSTORE_GS_CREDENTIALS_JSON
       - LAKEFS_STATS_ENABLED
@@ -76,8 +71,8 @@ services:
     networks:
       - ops
     extra_hosts:
-      - "s3.docker.lakefs.io:10.5.0.55"
-      - "example.s3.docker.lakefs.io:10.5.0.55"
+      - "s3.local.lakefs.io:10.5.0.55"
+      - "example.s3.local.lakefs.io:10.5.0.55"
   spark-worker-1:
     image: docker.io/bitnami/spark:3
     environment:
@@ -92,8 +87,8 @@ services:
     networks:
       - ops
     extra_hosts:
-      - "s3.docker.lakefs.io:10.5.0.55"
-      - "example.s3.docker.lakefs.io:10.5.0.55"
+      - "s3.local.lakefs.io:10.5.0.55"
+      - "example.s3.local.lakefs.io:10.5.0.55"
   spark-worker-2:
     image: docker.io/bitnami/spark:3
     environment:
@@ -108,8 +103,8 @@ services:
     networks:
       - ops
     extra_hosts:
-      - "s3.docker.lakefs.io:10.5.0.55"
-      - "example.s3.docker.lakefs.io:10.5.0.55"
+      - "s3.local.lakefs.io:10.5.0.55"
+      - "example.s3.local.lakefs.io:10.5.0.55"
   spark-submit:
     image: docker.io/bitnami/spark:3
     profiles: ["command"]
@@ -127,8 +122,8 @@ services:
     networks:
       - ops
     extra_hosts:
-      - "s3.docker.lakefs.io:10.5.0.55"
-      - "example.s3.docker.lakefs.io:10.5.0.55"
+      - "s3.local.lakefs.io:10.5.0.55"
+      - "example.s3.local.lakefs.io:10.5.0.55"
 
 volumes:
   lakefs-code:
