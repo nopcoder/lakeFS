@@ -24,9 +24,8 @@ jobs:
       - name: Build image
         run: docker build -t treeverse.io/lakefs --build-arg VERSION=${{ steps.version.outputs.tag }} .
 
-      - name: Setup Scala
-      - uses: olafurpg/setup-scala@v10
       - name: Compile Spark app
+        uses: olafurpg/setup-scala@v10
         run: |
             cd nessie/spark-app
             sbt compile
