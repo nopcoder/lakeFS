@@ -43,7 +43,7 @@ jobs:
           LAKEFS_GATEWAYS_S3_DOMAIN_NAME: s3.local.lakefs.io:8000
           NESSIE_TEST_DATA_ACCESS: false,false
           NESSIE_STORAGE_NAMESPACE: local://nessie-system-testing
-        run: docker-compose -f nessie/ops --profile test up --exit-code-from=nessie
+        run: docker-compose -f nessie/ops/docker-compose.yaml --profile test up --exit-code-from=nessie
 
       - name: Test lakeFS local with Spark
         env:
