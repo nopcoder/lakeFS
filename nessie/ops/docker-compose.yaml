@@ -1,18 +1,27 @@
 version: '3'
 services:
+  #dnsmasq:
+    #image: jpillora/dnsmasq
+    #ports:
+      #- 53:53/udp
+      #- 5380:8080
   lakefs:
     image: "${REPO}/lakefs:${TAG}"
     ports:
       - "8000:8000"
+    networks:
+      ops:
+        ipv4_address: 10.5.0.55
     depends_on:
       - "postgres"
     environment:
-      - LAKEFS_AUTH_ENCRYPT_SECRET_KEY=some random secret string
+      - LAKEFS_AUTH_ENCRYPT_SECRET_KEY=only_the_good_die_young
       - LAKEFS_DATABASE_CONNECTION_STRING=postgres://lakefs:lakefs@postgres/postgres?sslmode=disable
       - LAKEFS_BLOCKSTORE_TYPE=${LAKEFS_BLOCKSTORE_TYPE}
       - LAKEFS_BLOCKSTORE_LOCAL_PATH=/home/lakefs
       - LAKEFS_BLOCKSTORE_S3_CREDENTIALS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID}
       - LAKEFS_BLOCKSTORE_S3_CREDENTIALS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY}
+      - LAKEFS_GATEWAYS_S3_DOMAIN_NAME=s3.docker.lakefs.io
       - LAKEFS_LOGGING_LEVEL=DEBUG
       - LAKEFS_BLOCKSTORE_GS_CREDENTIALS_JSON
       - LAKEFS_STATS_ENABLED
@@ -24,15 +33,16 @@ services:
     image: "postgres:11"
     ports:
       - "5432:5432"
+    networks:
+      - ops
     environment:
       POSTGRES_USER: lakefs
       POSTGRES_PASSWORD: lakefs
   nessie:
     image: "golang:1.16.2-alpine"
-    links:
-      - lakefs:s3.local.lakefs.io
-      - lakefs:testmultipartupload.s3.local.lakefs.io
-      - lakefs:testdeleteobjects.s3.local.lakefs.io
+    profiles: ["test"]
+    networks:
+      - ops
     environment:
       - CGO_ENABLED=0
       - AWS_ACCESS_KEY_ID
@@ -47,6 +57,74 @@ services:
     entrypoint: ["go", "test", "-v", "./nessie", "--system-tests"]
     volumes:
       - lakefs-code:/lakefs
+  spark:
+    image: docker.io/bitnami/spark:3
+    environment:
+      - SPARK_MODE=master
+      - SPARK_MASTER_HOST=spark
+      - SPARK_RPC_AUTHENTICATION_ENABLED=no
+      - SPARK_RPC_ENCRYPTION_ENABLED=no
+      - SPARK_LOCAL_STORAGE_ENCRYPTION_ENABLED=no
+      - SPARK_SSL_ENABLED=no
+    ports:
+      - '8080:8080'
+      - '7077:7077'
+    networks:
+      - ops
+    extra_hosts:
+      - "s3.docker.lakefs.io:10.5.0.55"
+      - "example.s3.docker.lakefs.io:10.5.0.55"
+  spark-worker-1:
+    image: docker.io/bitnami/spark:3
+    environment:
+      - SPARK_MODE=worker
+      - SPARK_MASTER_URL=spark://spark:7077
+      - SPARK_WORKER_MEMORY=1G
+      - SPARK_WORKER_CORES=1
+      - SPARK_RPC_AUTHENTICATION_ENABLED=no
+      - SPARK_RPC_ENCRYPTION_ENABLED=no
+      - SPARK_LOCAL_STORAGE_ENCRYPTION_ENABLED=no
+      - SPARK_SSL_ENABLED=no
+    networks:
+      - ops
+    extra_hosts:
+      - "s3.docker.lakefs.io:10.5.0.55"
+      - "example.s3.docker.lakefs.io:10.5.0.55"
+  spark-worker-2:
+    image: docker.io/bitnami/spark:3
+    environment:
+      - SPARK_MODE=worker
+      - SPARK_MASTER_URL=spark://spark:7077
+      - SPARK_WORKER_MEMORY=1G
+      - SPARK_WORKER_CORES=1
+      - SPARK_RPC_AUTHENTICATION_ENABLED=no
+      - SPARK_RPC_ENCRYPTION_ENABLED=no
+      - SPARK_LOCAL_STORAGE_ENCRYPTION_ENABLED=no
+      - SPARK_SSL_ENABLED=no
+    networks:
+      - ops
+    extra_hosts:
+      - "s3.docker.lakefs.io:10.5.0.55"
+      - "example.s3.docker.lakefs.io:10.5.0.55"
+  spark-submit:
+    image: docker.io/bitnami/spark:3
+    profiles: ["command"]
+    command: spark-submit
+    environment:
+      - SPARK_MODE=worker
+      - SPARK_MASTER_URL=spark://spark:7077
+      - SPARK_WORKER_CORES=1
+      - SPARK_RPC_AUTHENTICATION_ENABLED=no
+      - SPARK_RPC_ENCRYPTION_ENABLED=no
+      - SPARK_LOCAL_STORAGE_ENCRYPTION_ENABLED=no
+      - SPARK_SSL_ENABLED=no
+    volumes:
+      - lakefs-code:/lakefs
+    networks:
+      - ops
+    extra_hosts:
+      - "s3.docker.lakefs.io:10.5.0.55"
+      - "example.s3.docker.lakefs.io:10.5.0.55"
 
 volumes:
   lakefs-code:
@@ -56,3 +134,10 @@ volumes:
       type: none
       device: ${LAKEFS_ROOT}
 
+networks:
+  ops:
+    driver: bridge
+    ipam:
+     config:
+       - subnet: 10.5.0.0/16
+         gateway: 10.5.0.1
