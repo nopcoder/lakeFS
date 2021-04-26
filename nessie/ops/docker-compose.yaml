@@ -43,6 +43,10 @@ services:
     profiles: ["test"]
     networks:
       - ops
+    extra_hosts:
+      - "s3.local.lakefs.io:10.5.0.55"
+      - "testmultipartupload.s3.local.lakefs.io:10.5.0.55"
+      - "testdeleteobjects.s3.local.lakefs.io:10.5.0.55"
     environment:
       - CGO_ENABLED=0
       - AWS_ACCESS_KEY_ID
