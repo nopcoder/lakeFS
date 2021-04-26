@@ -32,7 +32,7 @@ jobs:
 
       - name: Compile Spark app
         working-directory: nessie/spark-app
-        run: sbt compile
+        run: sbt package
 
       - name: Test lakeFS local
         env:
@@ -43,8 +43,7 @@ jobs:
           LAKEFS_GATEWAYS_S3_DOMAIN_NAME: s3.local.lakefs.io:8000
           NESSIE_TEST_DATA_ACCESS: false,false
           NESSIE_STORAGE_NAMESPACE: local://nessie-system-testing
-        working-directory: nessie/ops
-        run: docker-compose --profile test up --exit-code-from=nessie
+        run: docker-compose -f nessie/ops --profile test up --exit-code-from=nessie
 
       - name: Test lakeFS local with Spark
         env:
@@ -62,7 +61,6 @@ jobs:
       - name: lakeFS Logs on s3 failure
         if: ${{ failure() }}
         continue-on-error: true
-        working-directory: nessie/ops
         run: |
           docker-compose logs --tail=1000 lakefs
           docker-compose down --remove-orphans || true
