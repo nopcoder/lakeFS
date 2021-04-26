@@ -40,7 +40,7 @@ jobs:
           NESSIE_TEST_DATA_ACCESS: false,false
           NESSIE_STORAGE_NAMESPACE: local://nessie-system-testing
         run: |
-            docker-compose -f nessie/ops/docker-compose.yaml up --exit-code-from=nessie
+            docker-compose -f nessie/ops/docker-compose.yaml --profile test up --exit-code-from=nessie
             docker-compose -f nessie/ops/docker-compose.yaml lakefs lakefs superuser --user-name tester --access-key-id 'AKIAIOSFODNN7EXAMPLE' --secret-access-key 'wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY'
             docker-compose -f nessie/ops/docker-compose.yaml run --rm spark-submit spark-submit --master spark://spark:7077 -c "spark.hadoop.fs.s3a.access.key=AKIAIOSFODNN7EXAMPLE" -c "spark.hadoop.fs.s3a.secret.key=wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY" --class Sonnets /lakefs/nessie/spark-app/target/scala-2.12/sonnets_2.12-0.1.jar
       - name: lakeFS Logs on s3 failure
