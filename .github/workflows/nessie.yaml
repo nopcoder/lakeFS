@@ -58,7 +58,7 @@ jobs:
           TESTER_SECRET_ACCESS_KEY: wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY
         run: |
             docker-compose -f nessie/ops/docker-compose.yaml up -d
-            docker compose -f nessie/ops/docker-compose.yaml exec -T lakefs /app/wait-for localhost:8000
+            docker-compose -f nessie/ops/docker-compose.yaml exec -T lakefs /app/wait-for localhost:8000
             docker-compose -f nessie/ops/docker-compose.yaml exec -T lakefs lakefs superuser --user-name tester --access-key-id ${TESTER_ACCESS_KEY_ID} --secret-access-key ${TESTER_SECRET_ACCESS_KEY}
             docker-compose -f nessie/ops/docker-compose.yaml exec -T lakefs lakectl repo create lakefs://example ${NESSIE_STORAGE_NAMESPACE} -d master
             docker-compose -f nessie/ops/docker-compose.yaml exec -T lakefs lakectl fs upload -s /lakefs/spark-app/data-sets/sonnets.txt lakefs://example/master/sonnets.txt
