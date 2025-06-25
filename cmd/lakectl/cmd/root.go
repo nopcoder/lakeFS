@@ -26,6 +26,9 @@ import (
 	"github.com/treeverse/lakefs/pkg/local"
 	"github.com/treeverse/lakefs/pkg/logging"
 	"github.com/treeverse/lakefs/pkg/osinfo"
+	"os/exec"
+	"runtime"
+
 	"github.com/treeverse/lakefs/pkg/uri"
 	"github.com/treeverse/lakefs/pkg/version"
 	"golang.org/x/term"
@@ -422,7 +425,11 @@ func getKV(cmd *cobra.Command, name string) (map[string]string, error) {
 var rootCmd = &cobra.Command{
 	Use:   "lakectl",
 	Short: "A cli tool to explore manage and work with lakeFS",
-	Long:  `lakectl is a CLI tool allowing exploration and manipulation of a lakeFS environment`,
+	Long: `lakectl is a CLI tool allowing exploration and manipulation of a lakeFS environment.
+
+It supports extending its functionality through plugins. Any executable file
+on your PATH named 'lakectl-myplugin' can be invoked as 'lakectl myplugin'.
+Use 'lakectl plugin list' to see available plugins.`,
 	PersistentPreRun: func(cmd *cobra.Command, args []string) {
 		preRunCmd(cmd)
 		sendStats(cmd, "")
@@ -603,14 +610,169 @@ func getClient() *apigen.ClientWithResponses {
 	return client
 }
 
+// isUnknownCommandError checks if the error from ExecuteC is an unknown command error.
+// Cobra doesn't expose a specific error type for this, so we check the message.
+func isUnknownCommandError(err error) bool {
+	if err == nil {
+		return false
+	}
+	// This is based on the error message format from cobra.findSuggestions
+	// It might be brittle if Cobra changes its error messages.
+	return strings.HasPrefix(err.Error(), "unknown command")
+}
+
+// handlePluginCommand attempts to find and execute a lakectl plugin.
+// It returns true if a plugin was found and executed (or an attempt was made),
+// and false otherwise.
+func handlePluginCommand(cmd *cobra.Command, args []string) bool {
+	if len(args) == 0 {
+		return false // No command to interpret as a plugin
+	}
+
+	pluginCmdName := args[0]
+	pluginExecName := "lakectl-" + pluginCmdName
+
+	// Find the plugin in PATH
+	pluginPath, err := exec.LookPath(pluginExecName)
+	if err != nil {
+		if errors.Is(err, exec.ErrNotFound) {
+			// Plugin not found in PATH, not necessarily an error here,
+			// could be a genuine unknown command for lakectl itself.
+			return false
+		}
+		// Other error from LookPath (e.g., permission issues)
+		DieErr(fmt.Errorf("error looking up plugin %s: %w", pluginExecName, err))
+	}
+
+	// Check file stats
+	info, err := os.Stat(pluginPath)
+	if err != nil {
+		// This might happen if the file was removed between LookPath and Stat, or permissions changed.
+		DieErr(fmt.Errorf("error getting info for plugin %s: %w", pluginPath, err))
+	}
+
+	if info.IsDir() {
+		return false // It's a directory, not a plugin file, let Cobra handle.
+	}
+
+	// Check if executable (LookPath does this for non-Windows, but explicit check is good)
+	// On Windows, LookPath checks if it's an executable type, not necessarily permissions.
+	// On Unix, os.FileMode.Perm() & 0111 checks execute bit for user, group, or other.
+	if runtime.GOOS != "windows" && (info.Mode().Perm()&0111 == 0) {
+		DieErr(fmt.Errorf("plugin '%s' found at '%s' but is not executable", pluginCmdName, pluginPath))
+	}
+	// For Windows, LookPath finding it and it not being a directory is usually enough.
+
+	// Prepare and execute the plugin command
+	pluginArgs := args[1:]
+	externalCmd := exec.Command(pluginPath, pluginArgs...)
+	externalCmd.Stdout = os.Stdout
+	externalCmd.Stderr = os.Stderr
+	externalCmd.Stdin = os.Stdin
+	externalCmd.Env = os.Environ() // Pass parent environment
+
+	// Run the command
+	if err := externalCmd.Run(); err != nil {
+		if exitError, ok := err.(*exec.ExitError); ok {
+			// The command ran and exited with a non-zero status.
+			// We want lakectl to exit with the same status code.
+			os.Exit(exitError.ExitCode())
+		} else {
+			// Other errors (e.g., failed to start, I/O errors not related to exit status)
+			DieErr(fmt.Errorf("failed to run plugin %s: %w", pluginExecName, err))
+		}
+	}
+	return true // Plugin was handled
+}
+
 // Execute adds all child commands to the root command and sets flags appropriately.
 // This is called by main.main(). It only needs to happen once to the rootCmd.
 func Execute() {
-	err := rootCmd.Execute()
+	executedCmd, err := rootCmd.ExecuteC()
 	if err != nil {
+		// Check if it's an unknown command error and try to handle it as a plugin
+		if isUnknownCommandError(err) {
+			// executedCmd.Context() is nil for unknown commands, so we need to find the args from os.Args
+			// os.Args[0] is "lakectl", os.Args[1] would be the potential plugin command.
+			// We need to filter out flags that Cobra might have parsed before realizing it's an unknown command.
+			// However, for simplicity in the first pass, we'll use executedCmd.Flags().Args()
+			// if available, or fallback to os.Args, being mindful that Cobra's parsing
+			// When ExecuteC returns an unknown command error, 'executedCmd' is the command
+			// that was being processed (often rootCmd itself if the first arg is unknown).
+			// Its Flags().Args() should contain the sequence of non-flag arguments
+			// that Cobra couldn't match to a known command.
+			// For example, if `lakectl myplugin --myflag val arg1` is called,
+			// and `myplugin` is not built-in, then executedCmd.Flags().Args()
+			// should be `["myplugin", "--myflag", "val", "arg1"]` if --myflag is not a global flag,
+			// or `["myplugin", "val", "arg1"]` if --myflag was consumed by the plugin.
+			// More accurately, it will be all args that were not parsed as flags by Cobra for the executedCmd.
+			pluginCandidateArgs := executedCmd.Flags().Args()
+
+			// If executedCmd.Flags().Args() is empty, we might inspect os.Args directly.
+			// This could happen if the input was `lakectl unknown` and `unknown` was not parsed as an arg.
+			// However, `handlePluginCommand` itself checks if `pluginCandidateArgs` is empty.
+			// A more direct way to get what the user typed after `lakectl` and any global flags
+			// would be to find the command path in os.Args.
+			// For `lakectl --global-flag x unknown-cmd --plugin-flag y`:
+			// os.Args = ["lakectl", "--global-flag", "x", "unknown-cmd", "--plugin-flag", "y"]
+			// We need to pass ["unknown-cmd", "--plugin-flag", "y"] to handlePluginCommand.
+
+			// Let's find the actual command args passed by the user, after stripping lakectl itself
+			// and any flags that were processed by Cobra for the rootCmd.
+			// The `executedCmd.Flags().Args()` should give us the arguments that were not recognized
+			// by the command `executedCmd` (which is `rootCmd` in this case of top-level unknown command).
+			// So, if the user typed `lakectl --config my.cfg plugin-name --plugin-arg`,
+			// `rootCmd.ExecuteC()` would parse `--config my.cfg`, and then `rootCmd.Flags().Args()`
+			// should yield `["plugin-name", "--plugin-arg"]`.
+
+			if !handlePluginCommand(executedCmd, pluginCandidateArgs) {
+				// Not handled as a plugin, or plugin not found, so propagate original error.
+				// We also want to show help for the command that was attempted, if possible.
+				_ = executedCmd.Help() // Show help for the command that failed (e.g. rootCmd help)
+				DieErr(err)            // Then exit with the original error.
+			}
+			// If handlePluginCommand returned true, it means the plugin was executed (or attempted)
+			// and it handled os.Exit itself or completed successfully.
+			return
+		}
+		// For other errors, DieErr as before
 		DieErr(err)
 	}
 }
+
+// For testing purposes only
+func ResetConfigForTesting() {
+	cfgFile = "" // Prevent loading from default user config file during tests
+	cfg = new(Configuration) // Create a new instance for cfg
+
+	viper.Reset() // Reset all viper settings
+
+	// Re-initialize viper with default values by calling initConfig directly.
+	// initConfig sets defaults and then tries to read a config file (which won't be found if cfgFile is empty).
+	initConfig()
+
+	// After initConfig, viper has the defaults (and potentially env vars). Unmarshal into our cfg.
+	err := viper.UnmarshalExact(&cfg, viper.DecodeHook(
+		mapstructure.ComposeDecodeHookFunc(
+			lakefsconfig.DecodeOnlyString,
+			mapstructure.StringToTimeDurationHookFunc(),
+			lakefsconfig.DecodeStringToMap(),
+		)))
+	if err != nil {
+		// This is a fatal error in test setup, so panic.
+		panic(fmt.Sprintf("ResetConfigForTesting: failed to unmarshal config into cfg: %v. Viper keys: %v", err, viper.AllKeys()))
+	}
+}
+
+// BuildRootCmd returns the root command for lakectl.
+// For testing, this ensures we get the command structure.
+func BuildRootCmd() *cobra.Command {
+	// Since subcommands are added to the global rootCmd in their init() functions,
+	// and flags are also defined on this global, returning it is appropriate.
+	// Test execution will call SetArgs on the returned command.
+	return rootCmd
+}
+
 
 //nolint:gochecknoinits
 func init() {
