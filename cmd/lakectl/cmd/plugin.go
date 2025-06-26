@@ -23,8 +23,7 @@ Plugin Naming:
     (e.g., "lakectl-foo" -> "lakectl foo")
   - Dashes in the plugin name after "lakectl-" (e.g., "lakectl-foo-bar")
     will be part of the command users type ("lakectl foo-bar").
-    (Note: This differs slightly from kubectl where dashes create subcommands.
-    For lakectl, "lakectl-foo-bar" is a single plugin "foo-bar", not "foo bar".)
+    For lakectl, "lakectl-foo-bar" is treated as a single plugin named "foo-bar".
   - To include dashes in the invoked command name itself (e.g. "lakectl my-command"),
     use an underscore in the executable filename after the initial "lakectl-" prefix
     (e.g., "lakectl-my_command"). This will be callable as "lakectl my-command".

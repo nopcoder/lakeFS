@@ -119,11 +119,12 @@ var pluginListCmd = &cobra.Command{
 						}
 					}
 
-					if !isExecutable {
-						warnings = append(warnings, fmt.Sprintf("%s identified as a kubectl plugin, but it is not executable", fullPath))
-					}
+					// This specific warning isn't directly used later due to refined logic, but if it were:
+					// if !isExecutable {
+					//	 warnings = append(warnings, fmt.Sprintf("%s identified as a lakectl plugin, but it is not executable", fullPath))
+					// }
 					// Store all found, executable or not, to handle overshadowing warnings correctly.
-					pluginPaths[pluginName] = append(pluginPaths[pluginName], fullPath)
+					// pluginPaths[pluginName] = append(pluginPaths[pluginName], fullPath) // Old logic path
 				}
 			}
 		}
@@ -287,8 +288,8 @@ var pluginListCmd = &cobra.Command{
 		}
 
 		if len(distinctWarnings) > 0 || len(errorsList) > 0 {
-			// Print errors and warnings to stderr, but exit 0 as per kubectl behavior unless a fatal error occurred earlier.
-			// DieErr would have already exited for fatal errors.
+			// Print errors and warnings to stderr, but exit 0 unless a fatal error occurred earlier
+			// (which DieErr would have handled by exiting).
 			if len(errorsList) > 0 {
 				fmt.Fprintln(os.Stderr, "\nErrors encountered while listing plugins:")
 				for _, errMsg := range errorsList {
@@ -296,9 +297,6 @@ var pluginListCmd = &cobra.Command{
 				}
 			}
 			if len(distinctWarnings) > 0 {
-				// This message format is closer to kubectl's output for warnings.
-				// Kubectl prints "error: X plugin warnings were found" for its own warnings,
-				// and individual warnings under each plugin. Our template does the latter.
 				// A summary message to stderr is good.
 				fmt.Fprintf(os.Stderr, "\nWarning: %d plugin issue(s) found.\n", len(distinctWarnings))
 			}

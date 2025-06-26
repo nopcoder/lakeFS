@@ -427,9 +427,7 @@ var rootCmd = &cobra.Command{
 	Short: "A cli tool to explore manage and work with lakeFS",
 	Long: `lakectl is a CLI tool allowing exploration and manipulation of a lakeFS environment.
 
-It supports extending its functionality through plugins. Any executable file
-on your PATH named 'lakectl-myplugin' can be invoked as 'lakectl myplugin'.
-Use 'lakectl plugin list' to see available plugins.`,
+It can be extended with plugins; see 'lakectl plugin --help' for more information.`,
 	PersistentPreRun: func(cmd *cobra.Command, args []string) {
 		preRunCmd(cmd)
 		sendStats(cmd, "")
