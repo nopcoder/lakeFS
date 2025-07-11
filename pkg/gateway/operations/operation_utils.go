@@ -7,6 +7,8 @@ import (
 
 	"github.com/treeverse/lakefs/pkg/catalog"
 	"github.com/treeverse/lakefs/pkg/graveler"
+	"github.com/treeverse/lakefs/pkg/graveler"
+	"github.com/treeverse/lakefs/pkg/graveler"
 	"github.com/treeverse/lakefs/pkg/logging"
 )
 
@@ -60,7 +62,16 @@ func (o *PathOperation) finishUpload(req *http.Request, mTime *time.Time, checks
 		ContentType(contentType).
 		Build()
 
-	err := o.Catalog.CreateEntry(req.Context(), o.Repository.Name, o.Reference, entry, graveler.WithIfAbsent(!allowOverwrite))
+	var opts []graveler.Option
+	if !allowOverwrite { // This corresponds to If-None-Match: *
+		opts = append(opts, graveler.WithIfAbsent(true))
+	}
+	// ifMatchETag will be an unquoted ETag string or empty
+	if ifMatchETag != "" { // This corresponds to If-Match: <ETag>
+		opts = append(opts, graveler.WithIfMatch(ifMatchETag))
+	}
+
+	err := o.Catalog.CreateEntry(req.Context(), o.Repository.Name, o.Reference, entry, opts...)
 	if err != nil {
 		o.Log(req).WithError(err).Error("could not update metadata")
 		return err

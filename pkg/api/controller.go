@@ -3417,26 +3417,56 @@ func (c *Controller) UploadObject(w http.ResponseWriter, r *http.Request, reposi
 		return
 	}
 
-	// before writing body, ensure preconditions - this means we essentially check for object existence twice:
-	// once before uploading the body to save resources and time,
-	//	and then graveler will check again when passed a SetOptions.
+	// Handle If-None-Match header
 	allowOverwrite := true
-	if params.IfNoneMatch != nil {
-		if swag.StringValue((*string)(params.IfNoneMatch)) != "*" {
+	ifNoneMatch := params.IfNoneMatch
+	if ifNoneMatch != nil {
+		if swag.StringValue((*string)(ifNoneMatch)) != "*" {
 			writeError(w, r, http.StatusBadRequest, "Unsupported value for If-None-Match - Only \"*\" is supported")
 			return
 		}
-		// check if exists
-		_, err := c.Catalog.GetEntry(ctx, repo.Name, branch, params.Path, catalog.GetEntryParams{})
-		if err == nil {
-			writeError(w, r, http.StatusPreconditionFailed, "path already exists")
+		// Pre-upload check for If-None-Match: *
+		// This is an optimization to fail early before uploading data.
+		// The catalog layer will perform the atomic check during CreateEntry.
+		_, errGet := c.Catalog.GetEntry(ctx, repo.Name, branch, params.Path, catalog.GetEntryParams{})
+		if errGet == nil {
+			writeError(w, r, http.StatusPreconditionFailed, graveler.ErrPreconditionFailed)
 			return
 		}
-		if !errors.Is(err, graveler.ErrNotFound) {
-			writeError(w, r, http.StatusInternalServerError, err)
+		if !errors.Is(errGet, graveler.ErrNotFound) {
+			writeError(w, r, http.StatusInternalServerError, errGet)
 			return
 		}
-		allowOverwrite = false
+		allowOverwrite = false // This signals to CreateEntry to use WithIfAbsent(true)
+	}
+
+	// Handle If-Match header
+	ifMatchETag := ""
+	if params.IfMatch != nil {
+		ifMatchETag = swag.StringValue((*string)(params.IfMatch))
+		if ifMatchETag == "" {
+			writeError(w, r, http.StatusBadRequest, "If-Match header cannot be empty when present")
+			return
+		}
+		// Pre-upload check for If-Match: <ETag>
+		// This is an optimization to fail early.
+		// The catalog layer will perform the atomic check.
+		entry, errGet := c.Catalog.GetEntry(ctx, repo.Name, branch, params.Path, catalog.GetEntryParams{})
+		if errors.Is(errGet, graveler.ErrNotFound) {
+			writeError(w, r, http.StatusPreconditionFailed, graveler.ErrPreconditionFailed) // Object does not exist
+			return
+		}
+		if errGet != nil {
+			writeError(w, r, http.StatusInternalServerError, errGet)
+			return
+		}
+		// Compare ETag (checksum) - ensure correct quoting for comparison
+		// The ETag from the header is typically quoted (e.g., "checksum").
+		// The ETag in the catalog (entry.Checksum) is typically unquoted.
+		if httputil.ETag(entry.Checksum) != ifMatchETag {
+			writeError(w, r, http.StatusPreconditionFailed, graveler.ErrPreconditionFailed) // ETag does not match
+			return
+		}
 	}
 
 	// read request body parse multipart for "content" and upload the data
@@ -3527,9 +3557,27 @@ func (c *Controller) UploadObject(w http.ResponseWriter, r *http.Request, reposi
 	}
 	entry := entryBuilder.Build()
 
-	err = c.Catalog.CreateEntry(ctx, repo.Name, branch, entry, graveler.WithIfAbsent(!allowOverwrite), graveler.WithForce(swag.BoolValue(params.Force)))
+	createEntryOpts := []graveler.SetOptionsFunc{graveler.WithForce(swag.BoolValue(params.Force))}
+	if !allowOverwrite { // Corresponds to If-None-Match: *
+		createEntryOpts = append(createEntryOpts, graveler.WithIfAbsent(true))
+	}
+	if ifMatchETag != "" { // Corresponds to If-Match: <ETag>
+		// The ETag from header is quoted, graveler expects unquoted
+		unquotedIfMatchETag := httputil.StripQuotesAndSpaces(ifMatchETag)
+		createEntryOpts = append(createEntryOpts, graveler.WithIfMatch(unquotedIfMatchETag))
+	}
+
+	err = c.Catalog.CreateEntry(ctx, repo.Name, branch, entry, createEntryOpts...)
 	if errors.Is(err, graveler.ErrPreconditionFailed) {
-		writeError(w, r, http.StatusPreconditionFailed, "path already exists")
+		// Let specific precondition failed errors from deeper layers propagate if they are more specific
+		// Otherwise, use a generic message.
+		errMsg := "precondition failed"
+		if allowOverwrite && ifMatchETag != "" { // If-Match failed
+			errMsg = "If-Match condition failed"
+		} else if !allowOverwrite { // If-None-Match failed
+			errMsg = "If-None-Match condition failed: path already exists"
+		}
+		writeError(w, r, http.StatusPreconditionFailed, errMsg)
 		return
 	}
 	if c.handleAPIError(ctx, w, r, err) {

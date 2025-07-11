@@ -21,6 +21,7 @@ import (
 
 const (
 	IfNoneMatchHeader     = "If-None-Match"
+	IfMatchHeader         = "If-Match"
 	CopySourceHeader      = "x-amz-copy-source"
 	CopySourceRangeHeader = "x-amz-copy-source-range"
 	QueryParamUploadID    = "uploadId"
@@ -313,17 +314,52 @@ func handlePut(w http.ResponseWriter, req *http.Request, o *PathOperation) {
 		_ = o.EncodeError(w, req, err, gatewayErrors.Codes.ToAPIErr(gatewayErrors.ErrNotImplemented))
 		return
 	}
-	// before writing body, ensure preconditions - this means we essentially check for object existence twice:
-	// once here, before uploading the body to save resources and time,
-	// and then graveler will check again when passed a SetOptions.
-	if !allowOverwrite {
-		_, err := o.Catalog.GetEntry(req.Context(), o.Repository.Name, o.Reference, o.Path, catalog.GetEntryParams{})
-		if err == nil {
-			// In case object exists in catalog, no error returns
-			_ = o.EncodeError(w, req, err, gatewayErrors.Codes.ToAPIErr(gatewayErrors.ErrPreconditionFailed))
+
+	// check and validate whether if-match header provided
+	ifMatchETag, err := o.checkIfMatch(req)
+	if err != nil {
+		// TODO(Guys): should we return an error here? For example, if the ETag format is invalid
+		// For now, we'll pass it through and let graveler handle validation, or ignore if empty
+		_ = o.EncodeError(w, req, err, gatewayErrors.Codes.ToAPIErr(gatewayErrors.ErrInvalidRequest))
+		return
+	}
+
+	// Pre-upload checks:
+	// If If-None-Match is set, we fail early if the object exists.
+	// If If-Match is set, we fail early if the object does not exist or its ETag doesn't match.
+	// These checks are done before uploading the body to save resources and time.
+	// Graveler will perform these checks again atomically during the metadata update.
+	if !allowOverwrite { // If-None-Match: *
+		_, errGet := o.Catalog.GetEntry(req.Context(), o.Repository.Name, o.Reference, o.Path, catalog.GetEntryParams{})
+		if errGet == nil {
+			_ = o.EncodeError(w, req, graveler.ErrPreconditionFailed, gatewayErrors.Codes.ToAPIErr(gatewayErrors.ErrPreconditionFailed))
+			return
+		}
+		if !errors.Is(errGet, graveler.ErrNotFound) {
+			o.Log(req).WithError(errGet).Error("failed to get entry for If-None-Match check")
+			_ = o.EncodeError(w, req, errGet, gatewayErrors.Codes.ToAPIErr(gatewayErrors.ErrInternalError))
 			return
 		}
 	}
+
+	if ifMatchETag != "" {
+		entry, errGet := o.Catalog.GetEntry(req.Context(), o.Repository.Name, o.Reference, o.Path, catalog.GetEntryParams{})
+		if errGet != nil {
+			if errors.Is(errGet, graveler.ErrNotFound) {
+				_ = o.EncodeError(w, req, graveler.ErrPreconditionFailed, gatewayErrors.Codes.ToAPIErr(gatewayErrors.ErrPreconditionFailed))
+				return
+			}
+			o.Log(req).WithError(errGet).Error("failed to get entry for If-Match check")
+			_ = o.EncodeError(w, req, errGet, gatewayErrors.Codes.ToAPIErr(gatewayErrors.ErrInternalError))
+			return
+		}
+		// ETag stored in catalog is unquoted, header ETag is quoted
+		if httputil.ETag(entry.Checksum) != ifMatchETag {
+			_ = o.EncodeError(w, req, graveler.ErrPreconditionFailed, gatewayErrors.Codes.ToAPIErr(gatewayErrors.ErrPreconditionFailed))
+			return
+		}
+	}
+
 	objectPointer := block.ObjectPointer{
 		StorageID:        o.Repository.StorageID,
 		StorageNamespace: o.Repository.StorageNamespace,
@@ -340,7 +376,8 @@ func handlePut(w http.ResponseWriter, req *http.Request, o *PathOperation) {
 	// write metadata
 	metadata := amzMetaAsMetadata(req)
 	contentType := req.Header.Get("Content-Type")
-	err = o.finishUpload(req, &blob.CreationDate, blob.Checksum, blob.PhysicalAddress, blob.Size, true, metadata, contentType, allowOverwrite)
+	// Pass both allowOverwrite (for If-None-Match) and ifMatchETag (for If-Match)
+	err = o.finishUpload(req, &blob.CreationDate, blob.Checksum, blob.PhysicalAddress, blob.Size, true, metadata, contentType, allowOverwrite, ifMatchETag)
 	if errors.Is(err, graveler.ErrPreconditionFailed) {
 		_ = o.EncodeError(w, req, err, gatewayErrors.Codes.ToAPIErr(gatewayErrors.ErrPreconditionFailed))
 		return
@@ -370,4 +407,14 @@ func (o *PathOperation) checkIfAbsent(req *http.Request) (bool, error) {
 		return false, nil
 	}
 	return false, gatewayErrors.ErrNotImplemented
+}
+
+func (o *PathOperation) checkIfMatch(req *http.Request) (string, error) {
+	headerValue := req.Header.Get(IfMatchHeader)
+	if headerValue == "" {
+		return "", nil
+	}
+	// TODO(Guys): consider validating ETag format here - https://github.com/treeverse/lakeFS/issues/7035
+	// For now, we'll pass it through and let graveler handle validation
+	return headerValue, nil
 }
