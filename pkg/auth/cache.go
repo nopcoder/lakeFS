@@ -95,3 +95,11 @@ func (d *DummyCache) GetUserPolicies(_ string, setFn UserPoliciesSetFn) ([]*mode
 func (d *DummyCache) GetExternalPrincipal(_ string, setFn ExternalPrincipalFn) (*model.ExternalPrincipal, error) {
 	return setFn()
 }
+
+func (d *DummyCache) Len() int {
+	return 0
+}
+
+func (d *DummyCache) Stats() (hits, miss int, keyLen, valueLen int64) {
+	return 0, 0, 0, 0
+}

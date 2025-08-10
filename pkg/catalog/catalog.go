@@ -134,6 +134,10 @@ type Store interface {
 	graveler.Collaborator
 }
 
+type Cataloger interface {
+	GetGraveler() *graveler.Graveler
+}
+
 const (
 	RangeFSName     = "range"
 	MetaRangeFSName = "meta-range"
@@ -2949,6 +2953,10 @@ func (c *Catalog) GetAddressWithSignature(repository, branch, path string) (stri
 		return "", err
 	}
 	return physicalPath + LinkAddressSigningDelimiter + c.signAddress(data), nil
+}
+
+func (c *Catalog) GetGraveler() *graveler.Graveler {
+	return c.Store.(*graveler.Graveler)
 }
 
 func (c *Catalog) Close() error {

@@ -685,6 +685,14 @@ func newCache(cfg CacheConfig) cache.Cache {
 	return cache.NewCache(cfg.Size, cfg.Expiry, cache.NewJitterFn(cfg.Jitter))
 }
 
+func (m *Manager) RepositoryCache() cache.Cache {
+	return m.repoCache
+}
+
+func (m *Manager) CommitCache() cache.Cache {
+	return m.commitCache
+}
+
 func (m *Manager) DeleteExpiredImports(ctx context.Context, repository *graveler.RepositoryRecord) error {
 	expiry := time.Now().Add(-ImportExpiryTime)
 	repoPartition := graveler.RepoPartition(repository)

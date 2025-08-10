@@ -1199,6 +1199,10 @@ func NewGraveler(committedManager CommittedManager, stagingManager StagingManage
 	}
 }
 
+func (g *Graveler) RefManager() RefManager {
+	return g.refManager
+}
+
 func (g *Graveler) log(ctx context.Context) logging.Logger {
 	return g.logger.WithContext(ctx)
 }
