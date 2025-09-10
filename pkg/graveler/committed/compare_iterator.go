@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"errors"
+	"iter"
 
 	"github.com/treeverse/lakefs/pkg/graveler"
 )
@@ -269,4 +270,15 @@ func (d *compareIterator) Err() error {
 func (d *compareIterator) Close() {
 	d.diffIt.Close()
 	d.base.Close()
+}
+
+// All returns a Go 1.23 iter.Seq that can be used in range-over-function loops.
+// This provides a more idiomatic way to iterate over all compare diff entries.
+//
+// Example usage:
+//   for diff := range iterator.All() {
+//       // process compare diff
+//   }
+func (d *compareIterator) All() iter.Seq[*graveler.Diff] {
+	return graveler.DiffIteratorToSeq(d)
 }

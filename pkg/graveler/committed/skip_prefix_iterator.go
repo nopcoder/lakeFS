@@ -3,6 +3,7 @@ package committed
 import (
 	"sort"
 	"strings"
+	"iter"
 
 	"github.com/treeverse/lakefs/pkg/graveler"
 )
@@ -42,6 +43,25 @@ func (ipi *SkipPrefixIterator) Err() error {
 }
 func (ipi *SkipPrefixIterator) Close() {
 	ipi.rangeIterator.Close()
+}
+
+// AllWithRange returns a Go 1.23 iter.Seq2 that can be used in range-over-function loops.
+// This provides a more idiomatic way to iterate over all values with prefix skipping.
+//
+// Example usage:
+//   for value, rng := range iterator.AllWithRange() {
+//       // process value and range (with prefixes skipped)
+//   }
+func (ipi *SkipPrefixIterator) AllWithRange() iter.Seq2[*graveler.ValueRecord, *Range] {
+	return func(yield func(*graveler.ValueRecord, *Range) bool) {
+		defer ipi.Close()
+		for ipi.Next() {
+			value, rng := ipi.Value()
+			if !yield(value, rng) {
+				return
+			}
+		}
+	}
 }
 func (ipi *SkipPrefixIterator) SeekGE(id graveler.Key) {
 	ipi.rangeIterator.SeekGE(id)
