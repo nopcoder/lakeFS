@@ -3,6 +3,7 @@ package graveler
 import (
 	"bytes"
 	"errors"
+	"iter"
 )
 
 // JoinedDiffIterator calculate the union diff between 2 iterators.
@@ -129,4 +130,15 @@ func (c *JoinedDiffIterator) SeekGE(id Key) {
 	c.currentIter = nil
 	c.iterA.SeekGE(id)
 	c.iterB.SeekGE(id)
+}
+
+// All returns a Go 1.23 iter.Seq that can be used in range-over-function loops.
+// This provides a more idiomatic way to iterate over all joined diff entries.
+//
+// Example usage:
+//   for diff := range iterator.All() {
+//       // process joined diff
+//   }
+func (c *JoinedDiffIterator) All() iter.Seq[*Diff] {
+	return DiffIteratorToSeq(c)
 }

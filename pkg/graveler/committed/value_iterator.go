@@ -1,6 +1,9 @@
 package committed
 
-import "github.com/treeverse/lakefs/pkg/graveler"
+import (
+	"iter"
+	"github.com/treeverse/lakefs/pkg/graveler"
+)
 
 type valueIterator struct {
 	it Iterator
@@ -36,4 +39,15 @@ func NewValueIterator(it Iterator) graveler.ValueIterator {
 	return &valueIterator{
 		it: it,
 	}
+}
+
+// All returns a Go 1.23 iter.Seq that can be used in range-over-function loops.
+// This provides a more idiomatic way to iterate over all value records.
+//
+// Example usage:
+//   for value := range valueIterator.All() {
+//       // process value
+//   }
+func (v *valueIterator) All() iter.Seq[*graveler.ValueRecord] {
+	return graveler.IteratorToSeq(v)
 }

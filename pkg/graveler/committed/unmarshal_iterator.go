@@ -1,6 +1,7 @@
 package committed
 
 import (
+	"iter"
 	"github.com/treeverse/lakefs/pkg/graveler"
 )
 
@@ -59,4 +60,15 @@ func (r *UnmarshalIterator) Err() error {
 
 func (r *UnmarshalIterator) Close() {
 	r.it.Close()
+}
+
+// All returns a Go 1.23 iter.Seq that can be used in range-over-function loops.
+// This provides a more idiomatic way to iterate over all unmarshaled value records.
+//
+// Example usage:
+//   for value := range iterator.All() {
+//       // process unmarshaled value
+//   }
+func (r *UnmarshalIterator) All() iter.Seq[*graveler.ValueRecord] {
+	return graveler.IteratorToSeq(r)
 }

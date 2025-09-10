@@ -1,6 +1,9 @@
 package graveler
 
-import "bytes"
+import (
+	"bytes"
+	"iter"
+)
 
 // CombinedDiffIterator calculates the diff between a commit and a branch, including the staging area of the branch.
 // committedDiffIterator is the DiffIterator between the commit and the HEAD of the branch.
@@ -149,4 +152,15 @@ func (c *CombinedDiffIterator) Close() {
 	c.committedDiffIterator.Close()
 	c.leftIterator.Close()
 	c.stagingIterator.Close()
+}
+
+// All returns a Go 1.23 iter.Seq that can be used in range-over-function loops.
+// This provides a more idiomatic way to iterate over all diff entries.
+//
+// Example usage:
+//   for diff := range iterator.All() {
+//       // process diff
+//   }
+func (c *CombinedDiffIterator) All() iter.Seq[*Diff] {
+	return DiffIteratorToSeq(c)
 }

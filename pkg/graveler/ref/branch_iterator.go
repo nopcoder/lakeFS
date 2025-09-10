@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"sort"
+	"iter"
 
 	"github.com/treeverse/lakefs/pkg/graveler"
 	"github.com/treeverse/lakefs/pkg/kv"
@@ -104,6 +105,17 @@ func (bi *BranchSimpleIterator) Close() {
 	}
 }
 
+// All returns a Go 1.23 iter.Seq that can be used in range-over-function loops.
+// This provides a more idiomatic way to iterate over all branch records.
+//
+// Example usage:
+//   for branch := range iterator.All() {
+//       // process branch
+//   }
+func (bi *BranchSimpleIterator) All() iter.Seq[*graveler.BranchRecord] {
+	return graveler.BranchIteratorToSeq(bi)
+}
+
 // BranchByCommitIterator iterates over repository's branches ordered by Commit ID. Currently, implemented as in-mem iterator
 type BranchByCommitIterator struct {
 	ctx    context.Context
@@ -168,4 +180,15 @@ func (b *BranchByCommitIterator) Err() error {
 
 func (b *BranchByCommitIterator) Close() {
 	b.err = ErrIteratorClosed
+}
+
+// All returns a Go 1.23 iter.Seq that can be used in range-over-function loops.
+// This provides a more idiomatic way to iterate over all branch records sorted by commit ID.
+//
+// Example usage:
+//   for branch := range iterator.All() {
+//       // process branch (sorted by commit ID)
+//   }
+func (b *BranchByCommitIterator) All() iter.Seq[*graveler.BranchRecord] {
+	return graveler.BranchIteratorToSeq(b)
 }

@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"iter"
 
 	"github.com/treeverse/lakefs/pkg/graveler"
 )
@@ -134,6 +135,30 @@ func (rvi *iterator) Close() {
 	rvi.it.Close()
 }
 
+// All returns a Go 1.23 iter.Seq that can be used in range-over-function loops.
+// This provides a more idiomatic way to iterate over all value records.
+//
+// Example usage:
+//   for value, rng := range iterator.AllWithRange() {
+//       // process value and range
+//   }
+//   
+//   // Or just values:
+//   for value := range graveler.IteratorToSeq(iterator) {
+//       // process value only
+//   }
+func (rvi *iterator) AllWithRange() iter.Seq2[*graveler.ValueRecord, *Range] {
+	return func(yield func(*graveler.ValueRecord, *Range) bool) {
+		defer rvi.Close()
+		for rvi.Next() {
+			value, rng := rvi.Value()
+			if !yield(value, rng) {
+				return
+			}
+		}
+	}
+}
+
 func (rvi *iterator) loadRange(key graveler.Key) bool {
 	rvi.rangesIt.SeekGE(Key(key))
 	if err := rvi.rangesIt.Err(); err != nil {
@@ -189,3 +214,16 @@ func (e *emptyIterator) Err() error {
 }
 
 func (e *emptyIterator) Close() {}
+
+// AllWithRange returns a Go 1.23 iter.Seq2 that can be used in range-over-function loops.
+// For empty iterators, this returns an empty sequence.
+//
+// Example usage:
+//   for value, rng := range iterator.AllWithRange() {
+//       // never executed for empty iterator
+//   }
+func (e *emptyIterator) AllWithRange() iter.Seq2[*graveler.ValueRecord, *Range] {
+	return func(yield func(*graveler.ValueRecord, *Range) bool) {
+		// Empty iterator - nothing to yield
+	}
+}

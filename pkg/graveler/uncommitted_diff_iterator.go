@@ -3,6 +3,7 @@ package graveler
 import (
 	"bytes"
 	"context"
+	"iter"
 )
 
 type uncommittedDiffIterator struct {
@@ -110,4 +111,15 @@ func (d *uncommittedDiffIterator) Close() {
 	if d.committedList != nil {
 		d.committedList.Close()
 	}
+}
+
+// All returns a Go 1.23 iter.Seq that can be used in range-over-function loops.
+// This provides a more idiomatic way to iterate over all uncommitted diff entries.
+//
+// Example usage:
+//   for diff := range iterator.All() {
+//       // process uncommitted diff
+//   }
+func (d *uncommittedDiffIterator) All() iter.Seq[*Diff] {
+	return DiffIteratorToSeq(d)
 }

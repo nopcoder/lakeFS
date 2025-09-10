@@ -2,6 +2,7 @@ package graveler
 
 import (
 	"bytes"
+	"iter"
 )
 
 // CombinedIterator iterates over two listing iterators,
@@ -131,6 +132,17 @@ func (c *CombinedIterator) Close() {
 	c.iterB.Close()
 }
 
+// All returns a Go 1.23 iter.Seq that can be used in range-over-function loops.
+// This provides a more idiomatic way to iterate over all values.
+//
+// Example usage:
+//   for value := range iterator.All() {
+//       // process value
+//   }
+func (c *CombinedIterator) All() iter.Seq[*ValueRecord] {
+	return IteratorToSeq(c)
+}
+
 // FilterTombstoneIterator wraps a value iterator and filters out tombstones.
 type FilterTombstoneIterator struct {
 	iter ValueIterator
@@ -163,4 +175,15 @@ func (f *FilterTombstoneIterator) Err() error {
 
 func (f *FilterTombstoneIterator) Close() {
 	f.iter.Close()
+}
+
+// All returns a Go 1.23 iter.Seq that can be used in range-over-function loops.
+// This provides a more idiomatic way to iterate over all non-tombstone values.
+//
+// Example usage:
+//   for value := range iterator.All() {
+//       // process non-tombstone value
+//   }
+func (f *FilterTombstoneIterator) All() iter.Seq[*ValueRecord] {
+	return IteratorToSeq(f)
 }
