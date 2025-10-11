@@ -7,7 +7,6 @@ import (
 	"github.com/go-test/deep"
 	"github.com/stretchr/testify/require"
 	"github.com/treeverse/lakefs/pkg/graveler"
-	"github.com/treeverse/lakefs/pkg/graveler/testutil"
 )
 
 func TestJoinedDiffIterator_NextValue(t *testing.T) {
@@ -23,15 +22,15 @@ func TestJoinedDiffIterator_NextValue(t *testing.T) {
 		{
 			name: "empty iterators",
 			fields: fields{
-				iterA: testutil.NewDiffIter([]graveler.Diff{}),
-				iterB: testutil.NewDiffIter([]graveler.Diff{}),
+				iterA: graveler.NewDiffIter([]graveler.Diff{}),
+				iterB: graveler.NewDiffIter([]graveler.Diff{}),
 			},
 			wantValue: nil,
 		},
 		{
 			name: "only first iterator",
 			fields: fields{
-				iterA: testutil.NewDiffIter([]graveler.Diff{
+				iterA: graveler.NewDiffIter([]graveler.Diff{
 					{
 						Type: graveler.DiffTypeAdded,
 						Key:  []byte("iterA/a"),
@@ -65,7 +64,7 @@ func TestJoinedDiffIterator_NextValue(t *testing.T) {
 						},
 					},
 				}),
-				iterB: testutil.NewDiffIter([]graveler.Diff{}),
+				iterB: graveler.NewDiffIter([]graveler.Diff{}),
 			},
 			wantValue: []*graveler.Diff{
 				{
@@ -105,8 +104,8 @@ func TestJoinedDiffIterator_NextValue(t *testing.T) {
 		{
 			name: "only second iterator",
 			fields: fields{
-				iterA: testutil.NewDiffIter([]graveler.Diff{}),
-				iterB: testutil.NewDiffIter([]graveler.Diff{
+				iterA: graveler.NewDiffIter([]graveler.Diff{}),
+				iterB: graveler.NewDiffIter([]graveler.Diff{
 					{
 						Type: graveler.DiffTypeAdded,
 						Key:  []byte("iterA/a"),
@@ -179,7 +178,7 @@ func TestJoinedDiffIterator_NextValue(t *testing.T) {
 		{
 			name: "one from each",
 			fields: fields{
-				iterA: testutil.NewDiffIter([]graveler.Diff{
+				iterA: graveler.NewDiffIter([]graveler.Diff{
 					{
 						Type: graveler.DiffTypeAdded,
 						Key:  []byte("iterA/a"),
@@ -188,7 +187,7 @@ func TestJoinedDiffIterator_NextValue(t *testing.T) {
 						},
 					},
 				}),
-				iterB: testutil.NewDiffIter([]graveler.Diff{
+				iterB: graveler.NewDiffIter([]graveler.Diff{
 					{
 						Type: graveler.DiffTypeAdded,
 						Key:  []byte("iterA/b"),
@@ -220,7 +219,7 @@ func TestJoinedDiffIterator_NextValue(t *testing.T) {
 		{
 			name: "one from each different order",
 			fields: fields{
-				iterA: testutil.NewDiffIter([]graveler.Diff{
+				iterA: graveler.NewDiffIter([]graveler.Diff{
 					{
 						Type: graveler.DiffTypeAdded,
 						Key:  []byte("iterA/b"),
@@ -229,7 +228,7 @@ func TestJoinedDiffIterator_NextValue(t *testing.T) {
 						},
 					},
 				}),
-				iterB: testutil.NewDiffIter([]graveler.Diff{
+				iterB: graveler.NewDiffIter([]graveler.Diff{
 					{
 						Type: graveler.DiffTypeAdded,
 						Key:  []byte("iterA/a"),
@@ -261,7 +260,7 @@ func TestJoinedDiffIterator_NextValue(t *testing.T) {
 		{
 			name: "taking from first iterator before second",
 			fields: fields{
-				iterA: testutil.NewDiffIter([]graveler.Diff{
+				iterA: graveler.NewDiffIter([]graveler.Diff{
 					{
 						Type: graveler.DiffTypeAdded,
 						Key:  []byte("iterA/a"),
@@ -284,7 +283,7 @@ func TestJoinedDiffIterator_NextValue(t *testing.T) {
 						},
 					},
 				}),
-				iterB: testutil.NewDiffIter([]graveler.Diff{
+				iterB: graveler.NewDiffIter([]graveler.Diff{
 					{
 						Type: graveler.DiffTypeAdded,
 						Key:  []byte("iterA/a"),
@@ -339,7 +338,7 @@ func TestJoinedDiffIterator_NextValue(t *testing.T) {
 		{
 			name: "same values",
 			fields: fields{
-				iterA: testutil.NewDiffIter([]graveler.Diff{
+				iterA: graveler.NewDiffIter([]graveler.Diff{
 					{
 						Type: graveler.DiffTypeAdded,
 						Key:  []byte("iterA/a"),
@@ -373,7 +372,7 @@ func TestJoinedDiffIterator_NextValue(t *testing.T) {
 						},
 					},
 				}),
-				iterB: testutil.NewDiffIter([]graveler.Diff{
+				iterB: graveler.NewDiffIter([]graveler.Diff{
 					{
 						Type: graveler.DiffTypeAdded,
 						Key:  []byte("iterA/a"),
@@ -496,8 +495,8 @@ func TestJoinedDiffIterator_Error(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			itA := testutil.NewDiffIter([]graveler.Diff{})
-			itB := testutil.NewDiffIter([]graveler.Diff{})
+			itA := graveler.NewDiffIter([]graveler.Diff{})
+			itB := graveler.NewDiffIter([]graveler.Diff{})
 			if tt.iterAErr != nil {
 				itA.SetErr(tt.iterAErr)
 			}

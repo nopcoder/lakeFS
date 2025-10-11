@@ -1,4 +1,4 @@
-package graveler
+package graveler_test
 
 import (
 	"errors"

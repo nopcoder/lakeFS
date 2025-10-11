@@ -6,7 +6,6 @@ import (
 	"github.com/go-test/deep"
 	"github.com/stretchr/testify/require"
 	"github.com/treeverse/lakefs/pkg/graveler"
-	"github.com/treeverse/lakefs/pkg/graveler/testutil"
 )
 
 func TestCombinedIterator_NextValue(t *testing.T) {
@@ -24,8 +23,8 @@ func TestCombinedIterator_NextValue(t *testing.T) {
 			name: "empty iterators",
 			fields: fields{
 				iters: []graveler.ValueIterator{
-					testutil.NewValueIteratorFake([]graveler.ValueRecord{}),
-					testutil.NewValueIteratorFake([]graveler.ValueRecord{}),
+					graveler.NewValueIteratorFake([]graveler.ValueRecord{}),
+					graveler.NewValueIteratorFake([]graveler.ValueRecord{}),
 				},
 				p: nil,
 			},
@@ -35,7 +34,7 @@ func TestCombinedIterator_NextValue(t *testing.T) {
 			name: "only first iterator",
 			fields: fields{
 				iters: []graveler.ValueIterator{
-					testutil.NewValueIteratorFake([]graveler.ValueRecord{
+					graveler.NewValueIteratorFake([]graveler.ValueRecord{
 						{
 							Key: []byte("iterA/one"),
 							Value: &graveler.Value{
@@ -51,7 +50,7 @@ func TestCombinedIterator_NextValue(t *testing.T) {
 							},
 						},
 					}),
-					testutil.NewValueIteratorFake([]graveler.ValueRecord{}),
+					graveler.NewValueIteratorFake([]graveler.ValueRecord{}),
 				},
 				p: nil,
 			},
@@ -76,7 +75,7 @@ func TestCombinedIterator_NextValue(t *testing.T) {
 			name: "only one iterator",
 			fields: fields{
 				iters: []graveler.ValueIterator{
-					testutil.NewValueIteratorFake([]graveler.ValueRecord{
+					graveler.NewValueIteratorFake([]graveler.ValueRecord{
 						{
 							Key: []byte("iterA/one"),
 							Value: &graveler.Value{
@@ -116,8 +115,8 @@ func TestCombinedIterator_NextValue(t *testing.T) {
 			name: "only second iterator",
 			fields: fields{
 				iters: []graveler.ValueIterator{
-					testutil.NewValueIteratorFake([]graveler.ValueRecord{}),
-					testutil.NewValueIteratorFake([]graveler.ValueRecord{
+					graveler.NewValueIteratorFake([]graveler.ValueRecord{}),
+					graveler.NewValueIteratorFake([]graveler.ValueRecord{
 						{
 							Key: []byte("iterA/one"),
 							Value: &graveler.Value{
@@ -157,7 +156,7 @@ func TestCombinedIterator_NextValue(t *testing.T) {
 			name: "one from each",
 			fields: fields{
 				iters: []graveler.ValueIterator{
-					testutil.NewValueIteratorFake([]graveler.ValueRecord{
+					graveler.NewValueIteratorFake([]graveler.ValueRecord{
 						{
 							Key: []byte("iterA/two"),
 							Value: &graveler.Value{
@@ -166,7 +165,7 @@ func TestCombinedIterator_NextValue(t *testing.T) {
 							},
 						},
 					}),
-					testutil.NewValueIteratorFake([]graveler.ValueRecord{
+					graveler.NewValueIteratorFake([]graveler.ValueRecord{
 						{
 							Key: []byte("iterA/one"),
 							Value: &graveler.Value{
@@ -199,7 +198,7 @@ func TestCombinedIterator_NextValue(t *testing.T) {
 			name: "value tombstone",
 			fields: fields{
 				iters: []graveler.ValueIterator{
-					testutil.NewValueIteratorFake([]graveler.ValueRecord{
+					graveler.NewValueIteratorFake([]graveler.ValueRecord{
 						{
 							Key:   []byte("path/one"),
 							Value: nil,
@@ -212,7 +211,7 @@ func TestCombinedIterator_NextValue(t *testing.T) {
 							},
 						},
 					}),
-					testutil.NewValueIteratorFake([]graveler.ValueRecord{
+					graveler.NewValueIteratorFake([]graveler.ValueRecord{
 						{
 							Key: []byte("path/one"),
 							Value: &graveler.Value{
@@ -238,13 +237,13 @@ func TestCombinedIterator_NextValue(t *testing.T) {
 			name: "unexpected tombstone",
 			fields: fields{
 				iters: []graveler.ValueIterator{
-					testutil.NewValueIteratorFake([]graveler.ValueRecord{
+					graveler.NewValueIteratorFake([]graveler.ValueRecord{
 						{
 							Key:   []byte("path/one"),
 							Value: nil,
 						},
 					}),
-					testutil.NewValueIteratorFake([]graveler.ValueRecord{
+					graveler.NewValueIteratorFake([]graveler.ValueRecord{
 						{
 							Key: []byte("path/two"),
 							Value: &graveler.Value{
@@ -270,7 +269,7 @@ func TestCombinedIterator_NextValue(t *testing.T) {
 			name: "common prefix tombstone",
 			fields: fields{
 				iters: []graveler.ValueIterator{
-					testutil.NewValueIteratorFake([]graveler.ValueRecord{
+					graveler.NewValueIteratorFake([]graveler.ValueRecord{
 						{
 							Key: []byte("path/one"),
 							Value: &graveler.Value{
@@ -291,7 +290,7 @@ func TestCombinedIterator_NextValue(t *testing.T) {
 							Value: nil,
 						},
 					}),
-					testutil.NewValueIteratorFake([]graveler.ValueRecord{
+					graveler.NewValueIteratorFake([]graveler.ValueRecord{
 						{
 							Key: []byte("path/to/remove/one"),
 							Value: &graveler.Value{
@@ -345,7 +344,7 @@ func TestCombinedIterator_NextValue(t *testing.T) {
 			name: "common prefix tombstone with returned tombstones",
 			fields: fields{
 				iters: []graveler.ValueIterator{
-					testutil.NewValueIteratorFake([]graveler.ValueRecord{
+					graveler.NewValueIteratorFake([]graveler.ValueRecord{
 						{
 							Key: []byte("path/one"),
 							Value: &graveler.Value{
@@ -366,7 +365,7 @@ func TestCombinedIterator_NextValue(t *testing.T) {
 							Value: nil,
 						},
 					}),
-					testutil.NewValueIteratorFake([]graveler.ValueRecord{
+					graveler.NewValueIteratorFake([]graveler.ValueRecord{
 						{
 							Key: []byte("path/to/remove/one"),
 							Value: &graveler.Value{
@@ -433,7 +432,7 @@ func TestCombinedIterator_NextValue(t *testing.T) {
 			name: "4 iterators without tombstones",
 			fields: fields{
 				iters: []graveler.ValueIterator{
-					testutil.NewValueIteratorFake([]graveler.ValueRecord{
+					graveler.NewValueIteratorFake([]graveler.ValueRecord{
 						{
 							Key: []byte("path/one"),
 							Value: &graveler.Value{
@@ -449,7 +448,7 @@ func TestCombinedIterator_NextValue(t *testing.T) {
 							},
 						},
 					}),
-					testutil.NewValueIteratorFake([]graveler.ValueRecord{
+					graveler.NewValueIteratorFake([]graveler.ValueRecord{
 						{
 							Key: []byte("path/one"),
 							Value: &graveler.Value{
@@ -469,7 +468,7 @@ func TestCombinedIterator_NextValue(t *testing.T) {
 							Value: nil,
 						},
 					}),
-					testutil.NewValueIteratorFake([]graveler.ValueRecord{
+					graveler.NewValueIteratorFake([]graveler.ValueRecord{
 						{
 							Key:   []byte("path/one"),
 							Value: nil,
@@ -482,7 +481,7 @@ func TestCombinedIterator_NextValue(t *testing.T) {
 							},
 						},
 					}),
-					testutil.NewValueIteratorFake([]graveler.ValueRecord{
+					graveler.NewValueIteratorFake([]graveler.ValueRecord{
 						{
 							Key: []byte("path/one"),
 							Value: &graveler.Value{
@@ -534,7 +533,7 @@ func TestCombinedIterator_NextValue(t *testing.T) {
 			name: "4 iterators with tombstones",
 			fields: fields{
 				iters: []graveler.ValueIterator{
-					testutil.NewValueIteratorFake([]graveler.ValueRecord{
+					graveler.NewValueIteratorFake([]graveler.ValueRecord{
 						{
 							Key: []byte("path/one"),
 							Value: &graveler.Value{
@@ -550,7 +549,7 @@ func TestCombinedIterator_NextValue(t *testing.T) {
 							},
 						},
 					}),
-					testutil.NewValueIteratorFake([]graveler.ValueRecord{
+					graveler.NewValueIteratorFake([]graveler.ValueRecord{
 						{
 							Key: []byte("path/one"),
 							Value: &graveler.Value{
@@ -570,7 +569,7 @@ func TestCombinedIterator_NextValue(t *testing.T) {
 							Value: nil,
 						},
 					}),
-					testutil.NewValueIteratorFake([]graveler.ValueRecord{
+					graveler.NewValueIteratorFake([]graveler.ValueRecord{
 						{
 							Key:   []byte("path/one"),
 							Value: nil,
@@ -583,7 +582,7 @@ func TestCombinedIterator_NextValue(t *testing.T) {
 							},
 						},
 					}),
-					testutil.NewValueIteratorFake([]graveler.ValueRecord{
+					graveler.NewValueIteratorFake([]graveler.ValueRecord{
 						{
 							Key: []byte("path/one"),
 							Value: &graveler.Value{
