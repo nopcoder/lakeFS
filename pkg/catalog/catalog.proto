@@ -50,6 +50,12 @@ message RepositoryRestoreStatus {
 	Task task = 1;
 }
 
+message PrepareGCUncommittedStatus {
+  Task task = 1;
+  string run_id = 2;
+  string gc_uncommitted_location = 3;
+}
+
 // TaskMsg described generic message with Task field
 // used for all status messages and for cleanup messages
 message TaskMsg {

@@ -68,8 +68,9 @@ const (
 	// Deviation with gcPeriodicCheckSize = 100000 will be around 5 MB
 	gcPeriodicCheckSize = 100000
 
-	DumpRefsTaskIDPrefix    = "DR"
-	RestoreRefsTaskIDPrefix = "RR"
+	DumpRefsTaskIDPrefix             = "DR"
+	RestoreRefsTaskIDPrefix          = "RR"
+	PrepareGCUncommittedTaskIDPrefix = "PU"
 
 	TaskExpiryTime = 24 * time.Hour
 
@@ -3223,4 +3224,63 @@ func (w *UncommittedWriter) Write(p []byte) (n int, err error) {
 
 func (w *UncommittedWriter) Size() int64 {
 	return w.size
+}
+
+func (c *Catalog) PrepareGCUncommittedAsync(ctx context.Context, repositoryID string) (string, error) {
+	repository, err := c.getRepository(ctx, repositoryID)
+	if err != nil {
+		return "", err
+	}
+	if repository.ReadOnly {
+		return "", graveler.ErrReadOnlyRepository
+	}
+
+	taskID := NewTaskID(PrepareGCUncommittedTaskIDPrefix)
+	runID := c.Store.GCNewRunID()
+	taskStatus := &PrepareGCUncommittedStatus{
+		RunId: runID,
+	}
+
+	taskSteps := []taskStep{
+		{
+			Name: "prepare uncommitted",
+			Func: func(ctx context.Context) error {
+				var mark *GCUncommittedMark
+				for {
+					res, err := c.PrepareGCUncommitted(ctx, repositoryID, mark)
+					if err != nil {
+						return err
+					}
+					if res.Mark == nil {
+						break
+					}
+					mark = res.Mark
+				}
+				return nil
+			},
+		},
+	}
+
+	err = c.runBackgroundTaskSteps(repository, taskID, taskSteps, taskStatus)
+	if err != nil {
+		return "", err
+	}
+	return taskID, nil
+}
+
+func (c *Catalog) GetPrepareGCUncommittedStatus(ctx context.Context, repositoryID string, id string) (*PrepareGCUncommittedStatus, error) {
+	repository, err := c.getRepository(ctx, repositoryID)
+	if err != nil {
+		return nil, err
+	}
+	if !IsTaskID(PrepareGCUncommittedTaskIDPrefix, id) {
+		return nil, graveler.ErrNotFound
+	}
+
+	var taskStatus PrepareGCUncommittedStatus
+	err = GetTaskStatus(ctx, c.KVStore, repository, id, &taskStatus)
+	if err != nil {
+		return nil, err
+	}
+	return &taskStatus, nil
 }

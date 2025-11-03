@@ -1532,6 +1532,29 @@ components:
         - run_id
         - gc_uncommitted_location
 
+    PrepareGCUncommittedStatus:
+      type: object
+      required:
+        - id
+        - done
+        - update_time
+      properties:
+        id:
+          type: string
+          description: ID of the task
+        done:
+          type: boolean
+        update_time:
+          type: string
+          format: date-time
+        error:
+          type: string
+        run_id:
+          type: string
+        gc_uncommitted_location:
+          type: string
+          description: location of uncommitted information data
+
     GarbageCollectionRule:
       type: object
       properties:
@@ -5916,6 +5939,65 @@ paths:
           $ref: "#/components/responses/NotFound"
         429:
           description: too many requests
+        default:
+          $ref: "#/components/responses/ServerError"
+
+  /repositories/{repository}/gc/prepare_uncommitted_async:
+    parameters:
+      - in: path
+        name: repository
+        required: true
+        schema:
+          type: string
+    post:
+      tags:
+        - internal
+      operationId: prepareGarbageCollectionUncommittedAsync
+      summary: save repository uncommitted metadata for garbage collection asynchronously
+      responses:
+        202:
+          description: prepare uncommitted gc task created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TaskInfo"
+        401:
+          $ref: "#/components/responses/Unauthorized"
+        403:
+          $ref: "#/components/responses/Forbidden"
+        404:
+          $ref: "#/components/responses/NotFound"
+        default:
+          $ref: "#/components/responses/ServerError"
+
+  /repositories/{repository}/gc/prepare_uncommitted_async/{task_id}:
+    parameters:
+      - in: path
+        name: repository
+        required: true
+        schema:
+          type: string
+      - in: path
+        name: task_id
+        required: true
+        schema:
+          type: string
+    get:
+      tags:
+        - internal
+      operationId: prepareGarbageCollectionUncommittedStatus
+      summary: get status of a prepare uncommitted garbage collection task
+      responses:
+        200:
+          description: prepare uncommitted gc task status
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PrepareGCUncommittedStatus"
+        401:
+          $ref: "#/components/responses/Unauthorized"
+        404:
+          $ref: "#/components/responses/NotFound"
         default:
           $ref: "#/components/responses/ServerError"
 

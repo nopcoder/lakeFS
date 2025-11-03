@@ -658,6 +658,60 @@ func (c *Controller) PrepareGarbageCollectionUncommitted(w http.ResponseWriter, 
 	})
 }
 
+func (c *Controller) PrepareGarbageCollectionUncommittedAsync(w http.ResponseWriter, r *http.Request, repository string) {
+	if !c.authorize(w, r, permissions.Node{
+		Permission: permissions.Permission{
+			Action:   permissions.PrepareGarbageCollectionUncommittedAction,
+			Resource: permissions.RepoArn(repository),
+		},
+	}) {
+		return
+	}
+	ctx := r.Context()
+	c.LogAction(ctx, "prepare_garbage_collection_uncommitted_async", r, repository, "", "")
+	taskID, err := c.Catalog.PrepareGCUncommittedAsync(ctx, repository)
+	if c.handleAPIError(ctx, w, r, err) {
+		return
+	}
+
+	writeResponse(w, r, http.StatusAccepted, apigen.TaskInfo{
+		Id: taskID,
+	})
+}
+
+func (c *Controller) PrepareGarbageCollectionUncommittedStatus(w http.ResponseWriter, r *http.Request, repository string, taskId string) {
+	if !c.authorize(w, r, permissions.Node{
+		Permission: permissions.Permission{
+			Action:   permissions.PrepareGarbageCollectionUncommittedAction,
+			Resource: permissions.RepoArn(repository),
+		},
+	}) {
+		return
+	}
+	ctx := r.Context()
+	c.LogAction(ctx, "prepare_garbage_collection_uncommitted_status", r, repository, "", "")
+
+	status, err := c.Catalog.GetPrepareGCUncommittedStatus(ctx, repository, taskId)
+	if c.handleAPIError(ctx, w, r, err) {
+		return
+	}
+
+	// build response based on status
+	response := &apigen.PrepareGCUncommittedStatus{
+		Id:         taskId,
+		Done:       status.Task.Done,
+		UpdateTime: status.Task.UpdatedAt.AsTime(),
+	}
+	if status.Task.Error != "" {
+		response.Error = apiutil.Ptr(status.Task.Error)
+	}
+	if status.RunId != "" {
+		response.RunId = &status.RunId
+		response.GcUncommittedLocation = &status.GcUncommittedLocation
+	}
+	writeResponse(w, r, http.StatusOK, response)
+}
+
 func (c *Controller) GetAuthCapabilities(w http.ResponseWriter, r *http.Request) {
 	_, inviteSupported := c.Auth.(auth.EmailInviter)
 	writeResponse(w, r, http.StatusOK, apigen.AuthCapabilities{
