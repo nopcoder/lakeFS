@@ -1,6 +1,8 @@
 package logging
 
 import (
+	"fmt"
+	"os"
 	"runtime"
 	"strings"
 	"sync"
@@ -69,4 +71,28 @@ func getCaller() *runtime.Frame {
 
 	// if we got here, we failed to find the caller's context
 	return nil
+}
+
+// PathTrimmer is used to trim the caller paths to be relative to the project root
+type PathTrimmer struct {
+	trimPath string
+}
+
+func NewPathTrimmer(moduleName string) *PathTrimmer {
+	return &PathTrimmer{
+		trimPath: moduleName[strings.LastIndex(moduleName, "/")+1:],
+	}
+}
+
+// Trim trims the frame to be relative to the project root
+func (t *PathTrimmer) Trim(frame *runtime.Frame, moduleName string) (function string, file string) {
+	indexOfModule := strings.Index(strings.ToLower(frame.File), t.trimPath)
+	if indexOfModule != -1 {
+		file = frame.File[indexOfModule+len(t.trimPath):]
+	} else {
+		file = frame.File
+	}
+	file = fmt.Sprintf("%s:%d", strings.TrimPrefix(file, string(os.PathSeparator)), frame.Line)
+	function = strings.TrimPrefix(frame.Function, fmt.Sprintf("%s%s", moduleName, string(os.PathSeparator)))
+	return
 }

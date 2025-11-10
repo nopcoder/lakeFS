@@ -21,8 +21,7 @@ type contextKey string
 const (
 	LogFieldsContextKey = contextKey("log_fields")
 
-	ProjectDirectoryName = "lakefs"
-	ModuleName           = "github.com/treeverse/lakefs"
+	ModuleName = "github.com/treeverse/lakefs"
 
 	// durationStr is the suffix for the field holding a Duration as a
 	// string.
@@ -66,6 +65,8 @@ var (
 	defaultLogger     = logrus.New()
 	openLoggers       []io.Closer
 	syslogOnce        sync.Once
+	trimmer           *PathTrimmer
+	trimmerMu         sync.Mutex
 )
 
 func Level() string {
@@ -76,15 +77,18 @@ type Fields map[string]interface{}
 
 // logCallerTrimmer is used to trim the caller paths to be relative to the project root
 func logCallerTrimmer(frame *runtime.Frame) (function string, file string) {
-	indexOfModule := strings.Index(strings.ToLower(frame.File), ProjectDirectoryName)
-	if indexOfModule != -1 {
-		file = frame.File[indexOfModule+len(ProjectDirectoryName):]
-	} else {
-		file = frame.File
+	trimmerMu.Lock()
+	if trimmer == nil {
+		trimmer = NewPathTrimmer(ModuleName)
 	}
-	file = fmt.Sprintf("%s:%d", strings.TrimPrefix(file, string(os.PathSeparator)), frame.Line)
-	function = strings.TrimPrefix(frame.Function, fmt.Sprintf("%s%s", ModuleName, string(os.PathSeparator)))
-	return
+	trimmerMu.Unlock()
+	return trimmer.Trim(frame, ModuleName)
+}
+
+func SetTrimmer(moduleName string) {
+	trimmerMu.Lock()
+	defer trimmerMu.Unlock()
+	trimmer = NewPathTrimmer(moduleName)
 }
 
 func SetLevel(level string) {
