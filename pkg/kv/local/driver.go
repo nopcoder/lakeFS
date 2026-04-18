@@ -35,7 +35,7 @@ func (d *Driver) Open(ctx context.Context, kvParams kvparams.Config) (kv.Store, 
 	connection, ok := dbMap[params.Path]
 	if !ok {
 		// no database open for this path
-		var logger logging.Logger = logging.DummyLogger{}
+		var logger logging.Logger = logging.Dummy()
 		if params.EnableLogging {
 			logger = logging.FromContext(ctx).WithField("store", "local")
 		}

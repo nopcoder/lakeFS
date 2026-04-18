@@ -4,16 +4,12 @@ import (
 	"context"
 	"fmt"
 	"io"
-	"maps"
+	"log/slog"
 	"os"
-	"reflect"
-	"runtime"
-	"slices"
 	"strings"
 	"sync"
-	"time"
 
-	"github.com/sirupsen/logrus"
+	"github.com/lmittmann/tint"
 	"gopkg.in/natefinch/lumberjack.v2"
 )
 
@@ -23,115 +19,150 @@ const (
 	LogFieldsContextKey = contextKey("log_fields")
 
 	ProjectDirectoryName = "lakefs"
-	ModuleName           = "github.com/treeverse/lakefs"
 
-	// durationStr is the suffix for the field holding a Duration as a
-	// string.
-	durationStr = "_str"
-)
-
-// log_fields keys
-const (
-	// RepositoryFieldKey repository name (string)
-	RepositoryFieldKey = "repository"
-	// MatchedHostFieldKey matched host (bool) true when domain extracted from host
-	MatchedHostFieldKey = "matched_host"
-	// RefHostFieldKey reference id (string)
-	RefHostFieldKey = "ref"
-	// PathFieldKey path / request URI (string)
-	PathFieldKey = "path"
-	// UploadIDFieldKey s3 multipart upload ID (string) "upload_id"
-	UploadIDFieldKey = "upload_id"
-	// ListTypeFieldKey s3 list type version (string, ex: v1 or v2)
-	ListTypeFieldKey = "list_type"
-	// PhysicalAddressFieldKey object physical address (string)
+	RepositoryFieldKey      = "repository"
+	MatchedHostFieldKey     = "matched_host"
+	RefHostFieldKey         = "ref"
+	PathFieldKey            = "path"
+	UploadIDFieldKey        = "upload_id"
+	ListTypeFieldKey        = "list_type"
 	PhysicalAddressFieldKey = "physical_address"
-	// PartNumberFieldKey s3 multipart upload part number (string)
-	PartNumberFieldKey = "part_number"
-	// RequestIDFieldKey request ID (string) based on the request ID found on context
-	RequestIDFieldKey = "request_id"
-	// HostFieldKey request's host (string)
-	HostFieldKey = "host"
-	// MethodFieldKey request's method (string)
-	MethodFieldKey = "method"
-	// UserFieldKey user's name associated with the request (string)
-	UserFieldKey = "user"
-	// ServiceNameFieldKey service name (string, ex: rest_api)
-	ServiceNameFieldKey = "service_name"
-	// LogAudit kind of information to audit (string, ex: API)
-	LogAudit = "log_audit"
+	PartNumberFieldKey      = "part_number"
+	RequestIDFieldKey       = "request_id"
+	HostFieldKey            = "host"
+	MethodFieldKey          = "method"
+	UserFieldKey            = "user"
+	ServiceNameFieldKey     = "service_name"
+	LogAudit                = "log_audit"
 )
-
-var (
-	formatterInitOnce sync.Once
-	defaultLogger     = logrus.New()
-	openLoggers       []io.Closer
-	syslogOnce        sync.Once
-)
-
-func Level() string {
-	return defaultLogger.GetLevel().String()
-}
 
 type Fields map[string]any
 
-// logCallerTrimmer is used to trim the caller paths to be relative to the project root
-func logCallerTrimmer(frame *runtime.Frame) (function string, file string) {
-	indexOfModule := strings.Index(strings.ToLower(frame.File), ProjectDirectoryName)
-	if indexOfModule != -1 {
-		// Find the next path separator after the project directory name match
-		remainingPath := frame.File[indexOfModule+len(ProjectDirectoryName):]
-		separatorIdx := strings.Index(remainingPath, string(os.PathSeparator))
-		if separatorIdx != -1 {
-			file = remainingPath[separatorIdx:]
-		} else {
-			file = remainingPath
-		}
-	} else {
-		file = frame.File
-	}
-	file = fmt.Sprintf("%s:%d", strings.TrimPrefix(file, string(os.PathSeparator)), frame.Line)
+var (
+	defaultLogger *slog.Logger
+	openLoggers   []io.Closer
+	initOnce      sync.Once
+	currentLevel  slog.Level
+	currentFormat string
+	loggerMu      sync.RWMutex
+)
 
-	// For function name, find the module and then capture until the next separator
-	indexOfModuleName := strings.Index(frame.Function, ModuleName)
-	if indexOfModuleName != -1 {
-		remainingFunc := frame.Function[indexOfModuleName+len(ModuleName):]
-		if _, after, found := strings.Cut(remainingFunc, "/"); found {
-			function = after
-		} else {
-			// Handle case where there's no "/" but might have a "." (e.g., module.Function)
-			function = strings.TrimPrefix(remainingFunc, "/")
-		}
-	} else {
-		function = frame.Function
+func getLogger() *slog.Logger {
+	initOnce.Do(func() {
+		defaultLogger = newHandlerLogger(slog.LevelInfo, "text")
+		currentLevel = slog.LevelInfo
+		currentFormat = "text"
+	})
+	return defaultLogger
+}
+
+func newHandlerLogger(level slog.Level, format string) *slog.Logger {
+	var handler slog.Handler
+
+	output := os.Stderr
+
+	switch strings.ToLower(format) {
+	case "text":
+		handler = tint.NewHandler(output, &tint.Options{
+			Level:       level,
+			AddSource:   true,
+			ReplaceAttr: trimSourceAttr,
+		})
+	case "json":
+		handler = slog.NewJSONHandler(output, &slog.HandlerOptions{
+			Level:     level,
+			AddSource: true,
+		})
+	default:
+		handler = tint.NewHandler(output, &tint.Options{
+			Level:       level,
+			AddSource:   true,
+			ReplaceAttr: trimSourceAttr,
+		})
 	}
-	return
+
+	return slog.New(handler)
+}
+
+func trimSourceAttr(groups []string, a slog.Attr) slog.Attr {
+	if a.Key == "source" {
+		if v := a.Value.String(); v != "" {
+			idx := findLakeFSPath(v)
+			if idx > 0 {
+				return slog.Attr{Key: "source", Value: slog.StringValue(v[idx:])}
+			}
+		}
+	}
+	return a
+}
+
+func findLakeFSPath(s string) int {
+	lower := strings.ToLower(s)
+	idx := strings.Index(lower, ProjectDirectoryName)
+	if idx == -1 {
+		return 0
+	}
+	remaining := s[idx+len(ProjectDirectoryName):]
+	sepIdx := strings.Index(remaining, "/")
+	if sepIdx == -1 {
+		return 0
+	}
+	return idx + len(ProjectDirectoryName) + sepIdx
+}
+
+func Level() string {
+	loggerMu.RLock()
+	level := currentLevel
+	loggerMu.RUnlock()
+
+	switch level {
+	case slog.LevelDebug:
+		return "debug"
+	case slog.LevelInfo:
+		return "info"
+	case slog.LevelWarn:
+		return "warn"
+	case slog.LevelError:
+		return "error"
+	default:
+		return level.String()
+	}
 }
 
 func SetLevel(level string) {
+	var lvl slog.Level
 	switch strings.ToLower(level) {
-	case "trace":
-		defaultLogger.SetLevel(logrus.TraceLevel)
-	case "debug":
-		defaultLogger.SetLevel(logrus.DebugLevel)
+	case "trace", "debug":
+		lvl = slog.LevelDebug
 	case "info":
-		defaultLogger.SetLevel(logrus.InfoLevel)
+		lvl = slog.LevelInfo
 	case "warn", "warning":
-		defaultLogger.SetLevel(logrus.WarnLevel)
+		lvl = slog.LevelWarn
 	case "error":
-		defaultLogger.SetLevel(logrus.ErrorLevel)
+		lvl = slog.LevelError
 	case "panic":
-		defaultLogger.SetLevel(logrus.PanicLevel)
+		lvl = slog.LevelError + 1
 	case "null", "none":
-		defaultLogger.SetLevel(logrus.PanicLevel)
-		defaultLogger.SetOutput(io.Discard)
+		defaultLogger = slog.New(slog.NewTextHandler(io.Discard, nil))
+		loggerMu.Lock()
+		currentLevel = slog.LevelError + 1
+		loggerMu.Unlock()
+		return
+	default:
+		lvl = slog.LevelInfo
 	}
+
+	loggerMu.Lock()
+	defer loggerMu.Unlock()
+
+	defaultLogger = newHandlerLogger(lvl, currentFormat)
+	currentLevel = lvl
 }
 
 func CloseWriters() error {
 	for _, c := range openLoggers {
 		if err := c.Close(); err != nil {
-			return fmt.Errorf("close log writer: %w", err)
+			return err
 		}
 	}
 	openLoggers = nil
@@ -141,7 +172,7 @@ func CloseWriters() error {
 func SetOutputs(outputs []string, fileMaxSizeMB, filesKeep int) error {
 	var writers []io.Writer
 	if err := CloseWriters(); err != nil {
-		return fmt.Errorf("close previous log writers: %w", err)
+		return err
 	}
 	for _, output := range outputs {
 		var w io.Writer
@@ -163,260 +194,81 @@ func SetOutputs(outputs []string, fileMaxSizeMB, filesKeep int) error {
 		}
 		writers = append(writers, w)
 	}
+
+	loggerMu.Lock()
+	defer loggerMu.Unlock()
+
+	var handler slog.Handler
 	if len(writers) == 1 {
-		defaultLogger.SetOutput(writers[0])
+		handler = newHandlerFromWriter(writers[0], currentLevel, currentFormat)
 	} else if len(writers) > 1 {
-		defaultLogger.SetOutput(io.MultiWriter(writers...))
+		handler = newHandlerFromWriter(io.MultiWriter(writers...), currentLevel, currentFormat)
+	} else {
+		handler = newHandlerFromWriter(os.Stderr, currentLevel, currentFormat)
 	}
+
+	defaultLogger = slog.New(handler)
 	return nil
 }
 
+func newHandlerFromWriter(w io.Writer, level slog.Level, format string) slog.Handler {
+	switch strings.ToLower(format) {
+	case "text":
+		return tint.NewHandler(w, &tint.Options{
+			Level:       level,
+			AddSource:   true,
+			ReplaceAttr: trimSourceAttr,
+		})
+	case "json":
+		return slog.NewJSONHandler(w, &slog.HandlerOptions{
+			Level:     level,
+			AddSource: true,
+		})
+	default:
+		return tint.NewHandler(w, &tint.Options{
+			Level:       level,
+			AddSource:   true,
+			ReplaceAttr: trimSourceAttr,
+		})
+	}
+}
+
 func HasLogFileOutput(outputs []string) bool {
-	return slices.ContainsFunc(outputs, func(e string) bool {
-		return e != "" && e != "-" && e != "="
-	})
+	for _, o := range outputs {
+		if o != "" && o != "-" && o != "=" {
+			return true
+		}
+	}
+	return false
 }
 
 func GetLogFileOutputPath(outputs []string) string {
-	outFileIdx := slices.IndexFunc(outputs, func(e string) bool {
-		return e != "" && e != "-" && e != "="
-	})
-	return outputs[outFileIdx]
-}
-
-type OutputFormatOptions struct {
-	CallerPrettyfier func(*runtime.Frame) (function string, file string)
-}
-
-type OutputFormatOptionFunc func(options *OutputFormatOptions)
-
-func SetOutputFormat(format string, opts ...OutputFormatOptionFunc) {
-	// setup options
-	var options OutputFormatOptions
-	for _, opt := range opts {
-		opt(&options)
-	}
-	if options.CallerPrettyfier == nil {
-		options.CallerPrettyfier = logCallerTrimmer
-	}
-
-	// setup formatter
-	var formatter logrus.Formatter
-	switch strings.ToLower(format) {
-	case "text":
-		disableColors := false
-		noColor := os.Getenv("NO_COLOR")
-		if noColor != "" && noColor != "0" {
-			disableColors = true
-		}
-		formatter = &logrus.TextFormatter{
-			FullTimestamp:          true,
-			DisableLevelTruncation: true,
-			PadLevelText:           true,
-			QuoteEmptyFields:       true,
-			CallerPrettyfier:       options.CallerPrettyfier,
-			DisableColors:          disableColors,
-		}
-	case "json":
-		formatter = &logrus.JSONFormatter{
-			CallerPrettyfier: options.CallerPrettyfier,
-			PrettyPrint:      false,
-		}
-	default:
-		return // no known formatter found
-	}
-
-	// wrap it with our caller formatter
-	defaultLogger.SetFormatter(logrusCallerFormatter{formatter})
-}
-
-type Logger interface {
-	WithContext(ctx context.Context) Logger
-	WithField(key string, value any) Logger
-	WithFields(fields Fields) Logger
-	WithError(err error) Logger
-	Trace(args ...any)
-	Debug(args ...any)
-	Info(args ...any)
-	Warn(args ...any)
-	Warning(args ...any)
-	Error(args ...any)
-	Fatal(args ...any)
-	Panic(args ...any)
-	Log(level logrus.Level, args ...any)
-	Tracef(format string, args ...any)
-	Debugf(format string, args ...any)
-	Infof(format string, args ...any)
-	Warnf(format string, args ...any)
-	Warningf(format string, args ...any)
-	Errorf(format string, args ...any)
-	Fatalf(format string, args ...any)
-	Panicf(format string, args ...any)
-	Logf(level logrus.Level, format string, args ...any)
-	IsTracing() bool
-	IsDebugging() bool
-	IsInfo() bool
-	IsError() bool
-	IsWarn() bool
-}
-
-type logrusEntryWrapper struct {
-	e *logrus.Entry
-}
-
-func (l *logrusEntryWrapper) WithContext(ctx context.Context) Logger {
-	return addFromContext(
-		&logrusEntryWrapper{l.e.WithContext(ctx)},
-		ctx,
-	)
-}
-
-var durationType = reflect.TypeFor[time.Duration]()
-
-// splitDurationFields modifies fields to split every field of type
-// time.Duration into 2 fields, one "_nsecs" and one "_str".
-func (l *logrusEntryWrapper) WithFields(fields Fields) Logger {
-	var durationKeys []string
-	for key, value := range fields {
-		if value != nil && reflect.TypeOf(value).AssignableTo(durationType) {
-			durationKeys = append(durationKeys, key)
+	for _, o := range outputs {
+		if o != "" && o != "-" && o != "=" {
+			return o
 		}
 	}
-
-	for _, key := range durationKeys {
-		duration := fields[key].(time.Duration)
-		fields[key] = duration.Nanoseconds()
-		fields[key+durationStr] = duration.String()
-	}
-
-	return &logrusEntryWrapper{l.e.WithFields(logrus.Fields(fields))}
+	return ""
 }
 
-func (l *logrusEntryWrapper) WithField(key string, value any) Logger {
-	return l.WithFields(Fields{key: value})
+func SetOutputFormat(format string) {
+	loggerMu.Lock()
+	defer loggerMu.Unlock()
+
+	currentFormat = format
+	defaultLogger = newHandlerLogger(currentLevel, format)
 }
 
-func (l *logrusEntryWrapper) WithError(err error) Logger {
-	return &logrusEntryWrapper{l.e.WithError(err)}
+func SetLogger(logger *slog.Logger) {
+	loggerMu.Lock()
+	defer loggerMu.Unlock()
+	defaultLogger = logger
 }
 
-func (l *logrusEntryWrapper) Trace(args ...any) {
-	l.e.Trace(args...)
-}
-
-func (l *logrusEntryWrapper) Debug(args ...any) {
-	l.e.Debug(args...)
-}
-
-func (l *logrusEntryWrapper) Info(args ...any) {
-	l.e.Info(args...)
-}
-
-func (l *logrusEntryWrapper) Warn(args ...any) {
-	l.e.Warn(args...)
-}
-
-func (l *logrusEntryWrapper) Warning(args ...any) {
-	l.e.Warning(args...)
-}
-
-func (l *logrusEntryWrapper) Error(args ...any) {
-	l.e.Error(args...)
-}
-
-func (l *logrusEntryWrapper) Fatal(args ...any) {
-	l.e.Fatal(args...)
-}
-
-func (l *logrusEntryWrapper) Panic(args ...any) {
-	l.e.Panic(args...)
-}
-
-func (l *logrusEntryWrapper) Log(level logrus.Level, args ...any) {
-	l.e.Log(level, args...)
-}
-
-func (l *logrusEntryWrapper) Tracef(format string, args ...any) {
-	l.e.Tracef(format, args...)
-}
-
-func (l *logrusEntryWrapper) Debugf(format string, args ...any) {
-	l.e.Debugf(format, args...)
-}
-
-func (l *logrusEntryWrapper) Infof(format string, args ...any) {
-	l.e.Infof(format, args...)
-}
-
-func (l *logrusEntryWrapper) Warnf(format string, args ...any) {
-	l.e.Warnf(format, args...)
-}
-
-func (l *logrusEntryWrapper) Warningf(format string, args ...any) {
-	l.e.Warningf(format, args...)
-}
-
-func (l *logrusEntryWrapper) Errorf(format string, args ...any) {
-	l.e.Errorf(format, args...)
-}
-
-func (l *logrusEntryWrapper) Fatalf(format string, args ...any) {
-	l.e.Fatalf(format, args...)
-}
-
-func (l *logrusEntryWrapper) Panicf(format string, args ...any) {
-	l.e.Panicf(format, args...)
-}
-
-func (l *logrusEntryWrapper) Logf(level logrus.Level, format string, args ...any) {
-	l.e.Logf(level, format, args...)
-}
-
-func (l *logrusEntryWrapper) IsTracing() bool {
-	return l.e.Logger.IsLevelEnabled(logrus.TraceLevel)
-}
-
-func (l *logrusEntryWrapper) IsDebugging() bool {
-	return l.e.Logger.IsLevelEnabled(logrus.DebugLevel)
-}
-
-func (l *logrusEntryWrapper) IsInfo() bool {
-	return l.e.Logger.IsLevelEnabled(logrus.InfoLevel)
-}
-
-func (l *logrusEntryWrapper) IsError() bool {
-	return l.e.Logger.IsLevelEnabled(logrus.ErrorLevel)
-}
-
-func (l *logrusEntryWrapper) IsWarn() bool {
-	return l.e.Logger.IsLevelEnabled(logrus.WarnLevel)
-}
-
-type logrusCallerFormatter struct {
-	f logrus.Formatter
-}
-
-func (lf logrusCallerFormatter) Format(e *logrus.Entry) ([]byte, error) {
-	e.Caller = getCaller()
-	return lf.f.Format(e)
-}
-
-// ContextUnavailable returns a Logger when no context is available.  It
-// should be used only in code during startup, teardown, or tests.  Prefer
-// to use Default().
 func ContextUnavailable() Logger {
-	// wrap formatter with our own formatter that overrides caller
-	formatterInitOnce.Do(func() {
-		defaultLogger.SetReportCaller(true)
-		defaultLogger.SetNoLock()
-		defaultLogger.Formatter = logrusCallerFormatter{defaultLogger.Formatter}
-	})
-	return &logrusEntryWrapper{
-		e: logrus.NewEntry(defaultLogger),
-	}
+	return Logger{Logger: getLogger()}
 }
 
-// GetFieldsFromContext returns the logging fields on ctx or nil.
 func GetFieldsFromContext(ctx context.Context) Fields {
 	fields := ctx.Value(LogFieldsContextKey)
 	if fields == nil {
@@ -425,31 +277,167 @@ func GetFieldsFromContext(ctx context.Context) Fields {
 	return fields.(Fields)
 }
 
-func addFromContext(log Logger, ctx context.Context) Logger {
-	loggerFields := GetFieldsFromContext(ctx)
-	return log.WithFields(loggerFields)
-}
-
-// FromContext returns a Logger for reporting logs during ctx.  This logger
-// will typically include request IDs from the context.
 func FromContext(ctx context.Context) Logger {
-	return addFromContext(ContextUnavailable(), ctx)
+	logger := getLogger()
+	fields := GetFieldsFromContext(ctx)
+	if fields == nil {
+		return Logger{Logger: logger}
+	}
+	attrs := make([]any, 0, len(fields)*2)
+	for k, v := range fields {
+		attrs = append(attrs, k, v)
+	}
+	return Logger{Logger: logger.With(attrs...)}
 }
 
 func AddFields(ctx context.Context, fields Fields) context.Context {
-	ctxFields := ctx.Value(LogFieldsContextKey)
-	loggerFields := Fields{}
-	if ctxFields != nil {
-		loggerFields = ctxFields.(Fields)
+	if fields == nil {
+		return ctx
 	}
-	maps.Copy(loggerFields, fields)
+	existing := ctx.Value(LogFieldsContextKey)
+	var loggerFields Fields
+	if existing != nil {
+		loggerFields = existing.(Fields)
+	} else {
+		loggerFields = make(Fields)
+	}
+	for k, v := range fields {
+		loggerFields[k] = v
+	}
 	return context.WithValue(ctx, LogFieldsContextKey, loggerFields)
 }
 
-// CopyFieldsFromContext copies logging fields from srcCtx to dstCtx.
 func CopyFieldsFromContext(srcCtx, dstCtx context.Context) context.Context {
 	if fields := GetFieldsFromContext(srcCtx); fields != nil {
 		return context.WithValue(dstCtx, LogFieldsContextKey, fields)
 	}
 	return dstCtx
+}
+
+type Logger struct {
+	*slog.Logger
+}
+
+func (l Logger) WithField(key string, value any) Logger {
+	return Logger{Logger: l.Logger.With(key, value)}
+}
+
+func (l Logger) WithFields(fields Fields) Logger {
+	attrs := make([]any, 0, len(fields)*2)
+	for k, v := range fields {
+		attrs = append(attrs, k, v)
+	}
+	return Logger{Logger: l.Logger.With(attrs...)}
+}
+
+func (l Logger) WithError(err error) Logger {
+	return Logger{Logger: l.Logger.With("error", err)}
+}
+
+func (l Logger) WithContext(ctx context.Context) Logger {
+	fields := GetFieldsFromContext(ctx)
+	if fields == nil {
+		return l
+	}
+	attrs := make([]any, 0, len(fields)*2)
+	for k, v := range fields {
+		attrs = append(attrs, k, v)
+	}
+	return Logger{Logger: l.Logger.With(attrs...)}
+}
+
+func (l Logger) IsTracing() bool {
+	return l.Logger.Enabled(context.Background(), slog.LevelDebug-1)
+}
+
+func (l Logger) IsDebugging() bool {
+	return l.Logger.Enabled(context.Background(), slog.LevelDebug)
+}
+
+func (l Logger) IsInfo() bool {
+	return l.Logger.Enabled(context.Background(), slog.LevelInfo)
+}
+
+func (l Logger) IsError() bool {
+	return l.Logger.Enabled(context.Background(), slog.LevelError)
+}
+
+func (l Logger) IsWarn() bool {
+	return l.Logger.Enabled(context.Background(), slog.LevelWarn)
+}
+
+func (l Logger) Trace(msg ...any) {
+	l.Logger.Log(context.Background(), slog.LevelDebug-1, fmt.Sprint(msg...))
+}
+
+func (l Logger) Debug(args ...any) {
+	l.Logger.Debug(fmt.Sprint(args...))
+}
+
+func (l Logger) Info(args ...any) {
+	l.Logger.Info(fmt.Sprint(args...))
+}
+
+func (l Logger) Warn(args ...any) {
+	l.Logger.Warn(fmt.Sprint(args...))
+}
+
+func (l Logger) Warning(args ...any) {
+	l.Logger.Warn(fmt.Sprint(args...))
+}
+
+func (l Logger) Error(args ...any) {
+	l.Logger.Error(fmt.Sprint(args...))
+}
+
+func (l Logger) Fatal(args ...any) {
+	l.Logger.Log(context.Background(), slog.LevelError+1, fmt.Sprint(args...))
+}
+
+func (l Logger) Panic(args ...any) {
+	msg := fmt.Sprint(args...)
+	l.Logger.Log(context.Background(), slog.LevelError+2, msg)
+	panic(msg)
+}
+
+func (l Logger) Log(level slog.Level, args ...any) {
+	l.Logger.Log(context.Background(), level, fmt.Sprint(args...))
+}
+
+func (l Logger) Tracef(format string, args ...any) {
+	l.Logger.Debug(fmt.Sprintf(format, args...))
+}
+
+func (l Logger) Debugf(format string, args ...any) {
+	l.Logger.Debug(fmt.Sprintf(format, args...))
+}
+
+func (l Logger) Infof(format string, args ...any) {
+	l.Logger.Info(fmt.Sprintf(format, args...))
+}
+
+func (l Logger) Warnf(format string, args ...any) {
+	l.Logger.Warn(fmt.Sprintf(format, args...))
+}
+
+func (l Logger) Warningf(format string, args ...any) {
+	l.Logger.Warn(fmt.Sprintf(format, args...))
+}
+
+func (l Logger) Errorf(format string, args ...any) {
+	l.Logger.Error(fmt.Sprintf(format, args...))
+}
+
+func (l Logger) Fatalf(format string, args ...any) {
+	l.Logger.Log(context.Background(), slog.LevelError+1, fmt.Sprintf(format, args...))
+}
+
+func (l Logger) Panicf(format string, args ...any) {
+	msg := fmt.Sprintf(format, args...)
+	l.Logger.Log(context.Background(), slog.LevelError+2, msg)
+	panic(msg)
+}
+
+func (l Logger) Logf(level slog.Level, format string, args ...any) {
+	l.Logger.Log(context.Background(), level, fmt.Sprintf(format, args...))
 }

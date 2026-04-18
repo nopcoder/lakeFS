@@ -32,7 +32,7 @@ require (
 	github.com/prometheus/client_golang v1.20.5
 	github.com/rs/xid v1.5.0
 	github.com/schollz/progressbar/v3 v3.13.1
-	github.com/sirupsen/logrus v1.9.3
+	github.com/sirupsen/logrus v1.9.3 // indirect
 	github.com/spf13/cast v1.7.1 // indirect
 	github.com/spf13/cobra v1.10.2
 	github.com/spf13/pflag v1.0.10
@@ -84,7 +84,6 @@ require (
 	github.com/csimplestring/delta-go v0.0.0-20231105162402-9b93ca02cedf
 	github.com/databricks/databricks-sdk-go v0.26.2
 	github.com/dgraph-io/badger/v4 v4.7.0
-	github.com/elnormous/contenttype v1.0.4
 	github.com/georgysavva/scany/v2 v2.0.0
 	github.com/go-co-op/gocron v1.35.2
 	github.com/go-viper/mapstructure/v2 v2.4.0
@@ -94,6 +93,7 @@ require (
 	github.com/hashicorp/go-retryablehttp v0.7.7
 	github.com/hashicorp/go-version v1.8.0
 	github.com/jackc/pgx/v5 v5.6.0
+	github.com/lmittmann/tint v1.1.3
 	github.com/matoous/go-nanoid v1.5.0
 	github.com/minio/crc64nvme v1.0.1
 	github.com/puzpuzpuz/xsync v1.5.2

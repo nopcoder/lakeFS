@@ -126,7 +126,7 @@ type DummySender struct {
 }
 
 func (s *DummySender) SendEvent(_ context.Context, event *InputEvent) error {
-	if s.Logger == nil || !s.IsTracing() {
+	if s.Logger.Logger == nil || !s.IsTracing() {
 		return nil
 	}
 	s.WithFields(logging.Fields{
@@ -139,7 +139,7 @@ func (s *DummySender) SendEvent(_ context.Context, event *InputEvent) error {
 }
 
 func (s *DummySender) UpdateMetadata(_ context.Context, m Metadata) error {
-	if s.Logger == nil || !s.IsTracing() {
+	if s.Logger.Logger == nil || !s.IsTracing() {
 		return nil
 	}
 	s.WithFields(logging.Fields{
@@ -149,7 +149,7 @@ func (s *DummySender) UpdateMetadata(_ context.Context, m Metadata) error {
 }
 
 func (s *DummySender) UpdateCommPrefs(_ context.Context, commPrefs *CommPrefsData) error {
-	if s.Logger == nil || !s.IsTracing() {
+	if s.Logger.Logger == nil || !s.IsTracing() {
 		return nil
 	}
 	s.WithFields(logging.Fields{

@@ -2,13 +2,13 @@ package httputil
 
 import (
 	"context"
+	"log/slog"
 	"maps"
 	"net/http"
 	"strings"
 	"time"
 
 	"github.com/google/uuid"
-	"github.com/sirupsen/logrus"
 	"github.com/treeverse/lakefs/pkg/logging"
 )
 
@@ -107,7 +107,7 @@ func DefaultLoggingMiddleware(requestIDHeaderName string, fields logging.Fields,
 			if logLevel == "null" || logLevel == "none" {
 				logging.FromContext(r.Context()).WithFields(loggingFields).Debug(AuditLogEndMessage)
 			} else {
-				level, _ := logrus.ParseLevel(logLevel)
+				level := parseLogLevel(logLevel)
 				logging.FromContext(r.Context()).WithFields(loggingFields).Log(level, AuditLogEndMessage)
 			}
 		})
@@ -119,4 +119,19 @@ func LoggingMiddleware(requestIDHeaderName string, fields logging.Fields, loggin
 		return TracingMiddleware(requestIDHeaderName, fields, traceRequestHeaders, isAdvancedAuth)
 	}
 	return DefaultLoggingMiddleware(requestIDHeaderName, fields, loggingMiddlewareLevel, isAdvancedAuth)
+}
+
+func parseLogLevel(level string) slog.Level {
+	switch strings.ToLower(level) {
+	case "debug":
+		return slog.LevelDebug
+	case "info":
+		return slog.LevelInfo
+	case "warn", "warning":
+		return slog.LevelWarn
+	case "error":
+		return slog.LevelError
+	default:
+		return slog.LevelInfo
+	}
 }
