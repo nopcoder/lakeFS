@@ -207,6 +207,39 @@ type TaskResultIterator interface {
 	Close()
 }
 
+type hookEventMode struct {
+	runSync        bool
+	updateCommitID bool
+}
+
+var hookEventModes = map[graveler.EventType]hookEventMode{
+	graveler.EventTypePrepareCommit:    {runSync: true},
+	graveler.EventTypePreCommit:        {runSync: true},
+	graveler.EventTypePreMerge:         {runSync: true},
+	graveler.EventTypePreCreateTag:     {runSync: true},
+	graveler.EventTypePreDeleteTag:     {runSync: true},
+	graveler.EventTypePreCreateBranch:  {runSync: true},
+	graveler.EventTypePreDeleteBranch:  {runSync: true},
+	graveler.EventTypePreRevert:        {runSync: true},
+	graveler.EventTypePreCherryPick:    {runSync: true},
+	graveler.EventTypePostCommit:       {runSync: false, updateCommitID: true},
+	graveler.EventTypePostRevert:       {runSync: false, updateCommitID: true},
+	graveler.EventTypePostMerge:        {runSync: false},
+	graveler.EventTypePostCreateTag:    {runSync: false},
+	graveler.EventTypePostDeleteTag:    {runSync: false},
+	graveler.EventTypePostCreateBranch: {runSync: false},
+	graveler.EventTypePostDeleteBranch: {runSync: false},
+	graveler.EventTypePostCherryPick:   {runSync: false},
+}
+
+func hookMode(event graveler.EventType) (hookEventMode, error) {
+	mode, ok := hookEventModes[event]
+	if !ok {
+		return hookEventMode{}, fmt.Errorf("%w %q", ErrUnsupportedHookEvent, event)
+	}
+	return mode, nil
+}
+
 type Service interface {
 	Stop()
 	Run(ctx context.Context, record graveler.HookRecord) error
@@ -525,86 +558,23 @@ func (s *StoreService) ListRunTaskResults(ctx context.Context, repositoryID stri
 	return s.Store.ListRunTaskResults(ctx, repositoryID, runID, after)
 }
 
-func (s *StoreService) PrepareCommitHook(ctx context.Context, record graveler.HookRecord) error {
-	return s.Run(ctx, record)
-}
-
-func (s *StoreService) PreCommitHook(ctx context.Context, record graveler.HookRecord) error {
-	return s.Run(ctx, record)
-}
-
-func (s *StoreService) PostCommitHook(ctx context.Context, record graveler.HookRecord) error {
-	// update pre-commit with commit ID if needed
-	err := s.UpdateCommitID(ctx, record.Repository, record.PreRunID, record.CommitID.String())
+func (s *StoreService) HandleHook(ctx context.Context, record graveler.HookRecord) error {
+	mode, err := hookMode(record.EventType)
 	if err != nil {
+		s.stats.CollectEvent(stats.Event{Class: "actions_service", Name: "unsupported_hook_event"})
 		return err
 	}
 
-	s.asyncRun(ctx, record)
-	return nil
-}
-
-func (s *StoreService) PreMergeHook(ctx context.Context, record graveler.HookRecord) error {
-	return s.Run(ctx, record)
-}
-
-func (s *StoreService) PostMergeHook(ctx context.Context, record graveler.HookRecord) error {
-	s.asyncRun(ctx, record)
-	return nil
-}
-
-func (s *StoreService) PreCreateTagHook(ctx context.Context, record graveler.HookRecord) error {
-	return s.Run(ctx, record)
-}
-
-func (s *StoreService) PostCreateTagHook(ctx context.Context, record graveler.HookRecord) {
-	s.asyncRun(ctx, record)
-}
-
-func (s *StoreService) PreDeleteTagHook(ctx context.Context, record graveler.HookRecord) error {
-	return s.Run(ctx, record)
-}
-
-func (s *StoreService) PostDeleteTagHook(ctx context.Context, record graveler.HookRecord) {
-	s.asyncRun(ctx, record)
-}
-
-func (s *StoreService) PreCreateBranchHook(ctx context.Context, record graveler.HookRecord) error {
-	return s.Run(ctx, record)
-}
-
-func (s *StoreService) PostCreateBranchHook(ctx context.Context, record graveler.HookRecord) {
-	s.asyncRun(ctx, record)
-}
-
-func (s *StoreService) PreDeleteBranchHook(ctx context.Context, record graveler.HookRecord) error {
-	return s.Run(ctx, record)
-}
-
-func (s *StoreService) PostDeleteBranchHook(ctx context.Context, record graveler.HookRecord) {
-	s.asyncRun(ctx, record)
-}
-
-func (s *StoreService) PreRevertHook(ctx context.Context, record graveler.HookRecord) error {
-	return s.Run(ctx, record)
-}
-
-func (s *StoreService) PostRevertHook(ctx context.Context, record graveler.HookRecord) error {
-	// update pre-commit with commit ID if needed
-	err := s.UpdateCommitID(ctx, record.Repository, record.PreRunID, record.CommitID.String())
-	if err != nil {
-		return err
+	if mode.runSync {
+		return s.Run(ctx, record)
 	}
 
-	s.asyncRun(ctx, record)
-	return nil
-}
+	if mode.updateCommitID {
+		if err = s.UpdateCommitID(ctx, record.Repository, record.PreRunID, record.CommitID.String()); err != nil {
+			return err
+		}
+	}
 
-func (s *StoreService) PreCherryPickHook(ctx context.Context, record graveler.HookRecord) error {
-	return s.Run(ctx, record)
-}
-
-func (s *StoreService) PostCherryPickHook(ctx context.Context, record graveler.HookRecord) error {
 	s.asyncRun(ctx, record)
 	return nil
 }

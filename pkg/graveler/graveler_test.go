@@ -32,153 +32,99 @@ type Hooks struct {
 	TagID            graveler.TagID
 }
 
-func (h *Hooks) PrepareCommitHook(_ context.Context, record graveler.HookRecord) error {
-	h.Called = append(h.Called, "PrepareCommitHook")
-	h.RepositoryID = record.Repository.RepositoryID
-	h.StorageNamespace = record.Repository.StorageNamespace
-	h.BranchID = record.BranchID
-	return h.Errs["PrepareCommitHook"]
-}
+func (h *Hooks) HandleHook(_ context.Context, record graveler.HookRecord) error {
+	eventName := map[graveler.EventType]string{
+		graveler.EventTypePrepareCommit:    "PrepareCommitHook",
+		graveler.EventTypePreCommit:        "PreCommitHook",
+		graveler.EventTypePostCommit:       "PostCommitHook",
+		graveler.EventTypePreMerge:         "PreMergeHook",
+		graveler.EventTypePostMerge:        "PostMergeHook",
+		graveler.EventTypePreCreateTag:     "PreCreateTagHook",
+		graveler.EventTypePostCreateTag:    "PostCreateTagHook",
+		graveler.EventTypePreDeleteTag:     "PreDeleteTagHook",
+		graveler.EventTypePostDeleteTag:    "PostDeleteTagHook",
+		graveler.EventTypePreCreateBranch:  "PreCreateBranchHook",
+		graveler.EventTypePostCreateBranch: "PostCreateBranchHook",
+		graveler.EventTypePreDeleteBranch:  "PreDeleteBranchHook",
+		graveler.EventTypePostDeleteBranch: "PostDeleteBranchHook",
+		graveler.EventTypePreRevert:        "PreRevertHook",
+		graveler.EventTypePostRevert:       "PostRevertHook",
+		graveler.EventTypePreCherryPick:    "PreCherryPickHook",
+		graveler.EventTypePostCherryPick:   "PostCherryPickHook",
+	}[record.EventType]
 
-func (h *Hooks) PreCommitHook(_ context.Context, record graveler.HookRecord) error {
-	h.Called = append(h.Called, "PreCommitHook")
-	h.RepositoryID = record.Repository.RepositoryID
-	h.StorageNamespace = record.Repository.StorageNamespace
-	h.BranchID = record.BranchID
-	h.Commit = record.Commit
-	return h.Errs["PreCommitHook"]
-}
+	h.Called = append(h.Called, eventName)
 
-func (h *Hooks) PostCommitHook(_ context.Context, record graveler.HookRecord) error {
-	h.Called = append(h.Called, "PostCommitHook")
-	h.RepositoryID = record.Repository.RepositoryID
-	h.BranchID = record.BranchID
-	h.CommitID = record.CommitID
-	h.Commit = record.Commit
-	return h.Errs["PostCommitHook"]
-}
+	switch record.EventType {
+	case graveler.EventTypePrepareCommit:
+		h.RepositoryID = record.Repository.RepositoryID
+		h.StorageNamespace = record.Repository.StorageNamespace
+		h.BranchID = record.BranchID
+	case graveler.EventTypePreCommit:
+		h.RepositoryID = record.Repository.RepositoryID
+		h.StorageNamespace = record.Repository.StorageNamespace
+		h.BranchID = record.BranchID
+		h.Commit = record.Commit
+	case graveler.EventTypePostCommit:
+		h.RepositoryID = record.Repository.RepositoryID
+		h.BranchID = record.BranchID
+		h.CommitID = record.CommitID
+		h.Commit = record.Commit
+	case graveler.EventTypePreMerge:
+		h.RepositoryID = record.Repository.RepositoryID
+		h.StorageNamespace = record.Repository.StorageNamespace
+		h.BranchID = record.BranchID
+		h.SourceRef = record.SourceRef
+		h.Commit = record.Commit
+	case graveler.EventTypePostMerge:
+		h.RepositoryID = record.Repository.RepositoryID
+		h.StorageNamespace = record.Repository.StorageNamespace
+		h.BranchID = record.BranchID
+		h.SourceRef = record.SourceRef
+		h.CommitID = record.CommitID
+		h.Commit = record.Commit
+	case graveler.EventTypePreCreateTag, graveler.EventTypePostCreateTag:
+		h.StorageNamespace = record.Repository.StorageNamespace
+		h.RepositoryID = record.Repository.RepositoryID
+		h.CommitID = record.CommitID
+		h.TagID = record.TagID
+	case graveler.EventTypePreDeleteTag, graveler.EventTypePostDeleteTag:
+		h.StorageNamespace = record.Repository.StorageNamespace
+		h.RepositoryID = record.Repository.RepositoryID
+		h.TagID = record.TagID
+	case graveler.EventTypePreCreateBranch, graveler.EventTypePostCreateBranch:
+		h.StorageNamespace = record.Repository.StorageNamespace
+		h.RepositoryID = record.Repository.RepositoryID
+		h.BranchID = record.BranchID
+		h.CommitID = record.CommitID
+		h.SourceRef = record.SourceRef
+	case graveler.EventTypePreDeleteBranch, graveler.EventTypePostDeleteBranch:
+		h.StorageNamespace = record.Repository.StorageNamespace
+		h.RepositoryID = record.Repository.RepositoryID
+		h.BranchID = record.BranchID
+	case graveler.EventTypePreRevert:
+		h.RepositoryID = record.Repository.RepositoryID
+		h.StorageNamespace = record.Repository.StorageNamespace
+		h.BranchID = record.BranchID
+		h.Commit = record.Commit
+	case graveler.EventTypePostRevert:
+		h.RepositoryID = record.Repository.RepositoryID
+		h.BranchID = record.BranchID
+		h.CommitID = record.CommitID
+		h.Commit = record.Commit
+	case graveler.EventTypePreCherryPick:
+		h.RepositoryID = record.Repository.RepositoryID
+		h.StorageNamespace = record.Repository.StorageNamespace
+		h.BranchID = record.BranchID
+		h.Commit = record.Commit
+	case graveler.EventTypePostCherryPick:
+		h.RepositoryID = record.Repository.RepositoryID
+		h.BranchID = record.BranchID
+		h.CommitID = record.CommitID
+		h.Commit = record.Commit
+	}
 
-func (h *Hooks) PreMergeHook(_ context.Context, record graveler.HookRecord) error {
-	h.Called = append(h.Called, "PreMergeHook")
-	h.RepositoryID = record.Repository.RepositoryID
-	h.StorageNamespace = record.Repository.StorageNamespace
-	h.BranchID = record.BranchID
-	h.SourceRef = record.SourceRef
-	h.Commit = record.Commit
-	return h.Errs["PreMergeHook"]
-}
-
-func (h *Hooks) PostMergeHook(_ context.Context, record graveler.HookRecord) error {
-	h.Called = append(h.Called, "PostMergeHook")
-	h.RepositoryID = record.Repository.RepositoryID
-	h.StorageNamespace = record.Repository.StorageNamespace
-	h.BranchID = record.BranchID
-	h.SourceRef = record.SourceRef
-	h.CommitID = record.CommitID
-	h.Commit = record.Commit
-	return h.Errs["PostMergeHook"]
-}
-
-func (h *Hooks) PreCreateTagHook(_ context.Context, record graveler.HookRecord) error {
-	h.Called = append(h.Called, "PreCreateTagHook")
-	h.StorageNamespace = record.Repository.StorageNamespace
-	h.RepositoryID = record.Repository.RepositoryID
-	h.CommitID = record.CommitID
-	h.TagID = record.TagID
-	return h.Errs["PreCreateTagHook"]
-}
-
-func (h *Hooks) PostCreateTagHook(_ context.Context, record graveler.HookRecord) {
-	h.Called = append(h.Called, "PostCreateTagHook")
-	h.StorageNamespace = record.Repository.StorageNamespace
-	h.RepositoryID = record.Repository.RepositoryID
-	h.CommitID = record.CommitID
-	h.TagID = record.TagID
-}
-
-func (h *Hooks) PreDeleteTagHook(_ context.Context, record graveler.HookRecord) error {
-	h.Called = append(h.Called, "PreDeleteTagHook")
-	h.StorageNamespace = record.Repository.StorageNamespace
-	h.RepositoryID = record.Repository.RepositoryID
-	h.TagID = record.TagID
-	return h.Errs["PreDeleteTagHook"]
-}
-
-func (h *Hooks) PostDeleteTagHook(_ context.Context, record graveler.HookRecord) {
-	h.Called = append(h.Called, "PostDeleteTagHook")
-	h.StorageNamespace = record.Repository.StorageNamespace
-	h.RepositoryID = record.Repository.RepositoryID
-	h.TagID = record.TagID
-}
-
-func (h *Hooks) PreCreateBranchHook(_ context.Context, record graveler.HookRecord) error {
-	h.Called = append(h.Called, "PreCreateBranchHook")
-	h.StorageNamespace = record.Repository.StorageNamespace
-	h.RepositoryID = record.Repository.RepositoryID
-	h.BranchID = record.BranchID
-	h.CommitID = record.CommitID
-	h.SourceRef = record.SourceRef
-	return h.Errs["PreCreateBranchHook"]
-}
-
-func (h *Hooks) PostCreateBranchHook(_ context.Context, record graveler.HookRecord) {
-	h.Called = append(h.Called, "PostCreateBranchHook")
-	h.StorageNamespace = record.Repository.StorageNamespace
-	h.RepositoryID = record.Repository.RepositoryID
-	h.BranchID = record.BranchID
-	h.CommitID = record.CommitID
-	h.SourceRef = record.SourceRef
-}
-
-func (h *Hooks) PreDeleteBranchHook(_ context.Context, record graveler.HookRecord) error {
-	h.Called = append(h.Called, "PreDeleteBranchHook")
-	h.StorageNamespace = record.Repository.StorageNamespace
-	h.RepositoryID = record.Repository.RepositoryID
-	h.BranchID = record.BranchID
-	return h.Errs["PreDeleteBranchHook"]
-}
-
-func (h *Hooks) PostDeleteBranchHook(_ context.Context, record graveler.HookRecord) {
-	h.Called = append(h.Called, "PostDeleteBranchHook")
-	h.StorageNamespace = record.Repository.StorageNamespace
-	h.RepositoryID = record.Repository.RepositoryID
-	h.BranchID = record.BranchID
-}
-
-func (h *Hooks) PreRevertHook(_ context.Context, record graveler.HookRecord) error {
-	h.Called = append(h.Called, "PreRevertHook")
-	h.RepositoryID = record.Repository.RepositoryID
-	h.StorageNamespace = record.Repository.StorageNamespace
-	h.BranchID = record.BranchID
-	h.Commit = record.Commit
-	return h.Errs["PreRevertHook"]
-}
-
-func (h *Hooks) PostRevertHook(_ context.Context, record graveler.HookRecord) error {
-	h.Called = append(h.Called, "PostRevertHook")
-	h.RepositoryID = record.Repository.RepositoryID
-	h.BranchID = record.BranchID
-	h.CommitID = record.CommitID
-	h.Commit = record.Commit
-	return h.Errs["PostRevertHook"]
-}
-
-func (h *Hooks) PreCherryPickHook(_ context.Context, record graveler.HookRecord) error {
-	h.Called = append(h.Called, "PreCherryPickHook")
-	h.RepositoryID = record.Repository.RepositoryID
-	h.StorageNamespace = record.Repository.StorageNamespace
-	h.BranchID = record.BranchID
-	h.Commit = record.Commit
-	return h.Errs["PreCherryPickHook"]
-}
-
-func (h *Hooks) PostCherryPickHook(_ context.Context, record graveler.HookRecord) error {
-	h.Called = append(h.Called, "PostCherryPickHook")
-	h.RepositoryID = record.Repository.RepositoryID
-	h.BranchID = record.BranchID
-	h.CommitID = record.CommitID
-	h.Commit = record.Commit
-	return h.Errs["PostCherryPickHook"]
+	return h.Errs[eventName]
 }
 
 func (h *Hooks) NewRunID() string {

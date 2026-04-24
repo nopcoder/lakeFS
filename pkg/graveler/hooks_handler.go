@@ -59,90 +59,14 @@ type HookRecord struct {
 }
 
 type HooksHandler interface {
-	PrepareCommitHook(ctx context.Context, record HookRecord) error
-	PreCommitHook(ctx context.Context, record HookRecord) error
-	PostCommitHook(ctx context.Context, record HookRecord) error
-	PreMergeHook(ctx context.Context, record HookRecord) error
-	PostMergeHook(ctx context.Context, record HookRecord) error
-	PreCreateTagHook(ctx context.Context, record HookRecord) error
-	PostCreateTagHook(ctx context.Context, record HookRecord)
-	PreDeleteTagHook(ctx context.Context, record HookRecord) error
-	PostDeleteTagHook(ctx context.Context, record HookRecord)
-	PreCreateBranchHook(ctx context.Context, record HookRecord) error
-	PostCreateBranchHook(ctx context.Context, record HookRecord)
-	PreDeleteBranchHook(ctx context.Context, record HookRecord) error
-	PostDeleteBranchHook(ctx context.Context, record HookRecord)
-	PreRevertHook(ctx context.Context, record HookRecord) error
-	PostRevertHook(ctx context.Context, record HookRecord) error
-	PreCherryPickHook(ctx context.Context, record HookRecord) error
-	PostCherryPickHook(ctx context.Context, record HookRecord) error
+	HandleHook(ctx context.Context, record HookRecord) error
 	// NewRunID TODO (niro): WA for now until KV feature complete
 	NewRunID() string
 }
 
 type HooksNoOp struct{}
 
-func (h *HooksNoOp) PrepareCommitHook(context.Context, HookRecord) error {
-	return nil
-}
-
-func (h *HooksNoOp) PreCommitHook(context.Context, HookRecord) error {
-	return nil
-}
-
-func (h *HooksNoOp) PostCommitHook(context.Context, HookRecord) error {
-	return nil
-}
-
-func (h *HooksNoOp) PreMergeHook(context.Context, HookRecord) error {
-	return nil
-}
-
-func (h *HooksNoOp) PostMergeHook(context.Context, HookRecord) error {
-	return nil
-}
-
-func (h *HooksNoOp) PreCreateTagHook(context.Context, HookRecord) error {
-	return nil
-}
-
-func (h *HooksNoOp) PostCreateTagHook(context.Context, HookRecord) {
-}
-
-func (h *HooksNoOp) PreDeleteTagHook(context.Context, HookRecord) error {
-	return nil
-}
-
-func (h *HooksNoOp) PostDeleteTagHook(context.Context, HookRecord) {
-}
-
-func (h *HooksNoOp) PreCreateBranchHook(context.Context, HookRecord) error {
-	return nil
-}
-
-func (h *HooksNoOp) PostCreateBranchHook(context.Context, HookRecord) {
-}
-
-func (h *HooksNoOp) PreDeleteBranchHook(context.Context, HookRecord) error {
-	return nil
-}
-
-func (h *HooksNoOp) PostDeleteBranchHook(context.Context, HookRecord) {
-}
-
-func (h *HooksNoOp) PreRevertHook(context.Context, HookRecord) error {
-	return nil
-}
-
-func (h *HooksNoOp) PostRevertHook(context.Context, HookRecord) error {
-	return nil
-}
-
-func (h *HooksNoOp) PreCherryPickHook(context.Context, HookRecord) error {
-	return nil
-}
-
-func (h *HooksNoOp) PostCherryPickHook(context.Context, HookRecord) error {
+func (h *HooksNoOp) HandleHook(context.Context, HookRecord) error {
 	return nil
 }
 

@@ -9,6 +9,7 @@ var (
 	ErrIfExprNotBool         = errors.New("hook 'if' expression should evaluate to a boolean")
 	ErrParamConflict         = errors.New("parameters conflict")
 	ErrUnknownHookType       = errors.New("unknown hook type")
+	ErrUnsupportedHookEvent  = errors.New("unsupported hook event")
 	ErrInvalidAction         = errors.New("invalid action")
 	ErrInvalidEventParameter = errors.New("invalid event parameter")
 )

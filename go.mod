@@ -1,6 +1,6 @@
 module github.com/treeverse/lakefs
 
-go 1.25.8
+go 1.26.2
 
 require (
 	cloud.google.com/go v0.123.0 // indirect
@@ -98,6 +98,7 @@ require (
 	github.com/minio/crc64nvme v1.0.1
 	github.com/puzpuzpuz/xsync v1.5.2
 	github.com/skratchdot/open-golang v0.0.0-20200116055534-eef842397966
+	github.com/tetratelabs/wazero v1.11.0
 	github.com/tilinna/z85 v1.0.0
 	go.uber.org/ratelimit v0.3.0
 	gocloud.dev v0.34.1-0.20231122211418-53ccd8db26a1
@@ -335,7 +336,6 @@ require (
 	github.com/stbenjam/no-sprintf-host-port v0.3.1 // indirect
 	github.com/stretchr/objx v0.5.2 // indirect
 	github.com/tetafro/godot v1.5.4 // indirect
-	github.com/tetratelabs/wazero v1.11.0 // indirect
 	github.com/timakin/bodyclose v0.0.0-20241222091800-1db5c5ca4d67 // indirect
 	github.com/timonwong/loggercheck v0.11.0 // indirect
 	github.com/tomarrell/wrapcheck/v2 v2.12.0 // indirect

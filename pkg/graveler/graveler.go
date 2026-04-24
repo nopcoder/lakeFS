@@ -1341,6 +1341,17 @@ func GenerateStagingToken(repositoryID RepositoryID, branchID BranchID) StagingT
 	return StagingToken(fmt.Sprintf("%s-%s:%s", repositoryID, branchID, uid))
 }
 
+func (g *Graveler) runPostHook(ctx context.Context, record HookRecord) {
+	if err := g.hooks.HandleHook(ctx, record); err != nil {
+		g.log(ctx).
+			WithError(err).
+			WithField("event_type", record.EventType).
+			WithField("run_id", record.RunID).
+			WithField("pre_run_id", record.PreRunID).
+			Error("Post hook failed")
+	}
+}
+
 func (g *Graveler) CreateBranch(ctx context.Context, repository *RepositoryRecord, branchID BranchID, ref Ref, opts ...SetOptionsFunc) (*Branch, error) {
 	options := NewSetOptions(opts)
 	if repository.ReadOnly && !options.Force {
@@ -1371,7 +1382,7 @@ func (g *Graveler) CreateBranch(ctx context.Context, repository *RepositoryRecor
 	var preRunID string
 	if !repository.ReadOnly {
 		preRunID = g.hooks.NewRunID()
-		err = g.hooks.PreCreateBranchHook(ctx, HookRecord{
+		err = g.hooks.HandleHook(ctx, HookRecord{
 			RunID:      preRunID,
 			Repository: repository,
 			EventType:  EventTypePreCreateBranch,
@@ -1394,7 +1405,7 @@ func (g *Graveler) CreateBranch(ctx context.Context, repository *RepositoryRecor
 	}
 	if !repository.ReadOnly {
 		postRunID := g.hooks.NewRunID()
-		g.hooks.PostCreateBranchHook(ctx, HookRecord{
+		g.runPostHook(ctx, HookRecord{
 			RunID:      postRunID,
 			Repository: repository,
 			EventType:  EventTypePostCreateBranch,
@@ -1520,7 +1531,7 @@ func (g *Graveler) CreateTag(ctx context.Context, repository *RepositoryRecord, 
 
 	if !repository.ReadOnly {
 		preRunID = g.hooks.NewRunID()
-		err = g.hooks.PreCreateTagHook(ctx, HookRecord{
+		err = g.hooks.HandleHook(ctx, HookRecord{
 			RunID:      preRunID,
 			Repository: repository,
 			EventType:  EventTypePreCreateTag,
@@ -1543,7 +1554,7 @@ func (g *Graveler) CreateTag(ctx context.Context, repository *RepositoryRecord, 
 
 	if !repository.ReadOnly {
 		postRunID := g.hooks.NewRunID()
-		g.hooks.PostCreateTagHook(ctx, HookRecord{
+		g.runPostHook(ctx, HookRecord{
 			RunID:      postRunID,
 			Repository: repository,
 			EventType:  EventTypePostCreateTag,
@@ -1572,7 +1583,7 @@ func (g *Graveler) DeleteTag(ctx context.Context, repository *RepositoryRecord, 
 	var preRunID string
 	if !repository.ReadOnly {
 		preRunID = g.hooks.NewRunID()
-		err = g.hooks.PreDeleteTagHook(ctx, HookRecord{
+		err = g.hooks.HandleHook(ctx, HookRecord{
 			RunID:      preRunID,
 			Repository: repository,
 			EventType:  EventTypePreDeleteTag,
@@ -1596,7 +1607,7 @@ func (g *Graveler) DeleteTag(ctx context.Context, repository *RepositoryRecord, 
 
 	if !repository.ReadOnly {
 		postRunID := g.hooks.NewRunID()
-		g.hooks.PostDeleteTagHook(ctx, HookRecord{
+		g.runPostHook(ctx, HookRecord{
 			RunID:      postRunID,
 			Repository: repository,
 			EventType:  EventTypePostDeleteTag,
@@ -1662,7 +1673,7 @@ func (g *Graveler) DeleteBranch(ctx context.Context, repository *RepositoryRecor
 			SourceRef:  commitID.Ref(),
 			BranchID:   branchID,
 		}
-		err = g.hooks.PreDeleteBranchHook(ctx, preHookRecord)
+		err = g.hooks.HandleHook(ctx, preHookRecord)
 		if err != nil {
 			return &HookAbortError{
 				EventType: EventTypePreDeleteBranch,
@@ -1684,7 +1695,7 @@ func (g *Graveler) DeleteBranch(ctx context.Context, repository *RepositoryRecor
 
 	if !repository.ReadOnly {
 		postRunID := g.hooks.NewRunID()
-		g.hooks.PostDeleteBranchHook(ctx, HookRecord{
+		g.runPostHook(ctx, HookRecord{
 			RunID:      postRunID,
 			Repository: repository,
 			EventType:  EventTypePostDeleteBranch,
@@ -2269,7 +2280,7 @@ func (g *Graveler) Commit(ctx context.Context, repository *RepositoryRecord, bra
 	storageNamespace = repository.StorageNamespace
 	if !repository.ReadOnly {
 		prepareRunID := g.hooks.NewRunID()
-		err = g.hooks.PrepareCommitHook(ctx, HookRecord{
+		err = g.hooks.HandleHook(ctx, HookRecord{
 			RunID:      prepareRunID,
 			EventType:  EventTypePrepareCommit,
 			SourceRef:  branchID.Ref(),
@@ -2311,7 +2322,7 @@ func (g *Graveler) Commit(ctx context.Context, repository *RepositoryRecord, bra
 
 		if !repository.ReadOnly {
 			preRunID = g.hooks.NewRunID()
-			err = g.hooks.PreCommitHook(ctx, HookRecord{
+			err = g.hooks.HandleHook(ctx, HookRecord{
 				RunID:      preRunID,
 				EventType:  EventTypePreCommit,
 				SourceRef:  branchID.Ref(),
@@ -2385,7 +2396,7 @@ func (g *Graveler) Commit(ctx context.Context, repository *RepositoryRecord, bra
 
 	if !repository.ReadOnly {
 		postRunID := g.hooks.NewRunID()
-		err = g.hooks.PostCommitHook(ctx, HookRecord{
+		g.runPostHook(ctx, HookRecord{
 			EventType:  EventTypePostCommit,
 			RunID:      postRunID,
 			Repository: repository,
@@ -2395,12 +2406,6 @@ func (g *Graveler) Commit(ctx context.Context, repository *RepositoryRecord, bra
 			CommitID:   newCommitID,
 			PreRunID:   preRunID,
 		})
-		if err != nil {
-			g.log(ctx).WithError(err).
-				WithField("run_id", postRunID).
-				WithField("pre_run_id", preRunID).
-				Error("Post-commit hook failed")
-		}
 	}
 	return newCommitID, nil
 }
@@ -2900,7 +2905,7 @@ func (g *Graveler) Revert(ctx context.Context, repository *RepositoryRecord, bra
 
 		if !repository.ReadOnly {
 			preRunID = g.hooks.NewRunID()
-			err = g.hooks.PreRevertHook(ctx, HookRecord{
+			err = g.hooks.HandleHook(ctx, HookRecord{
 				RunID:      preRunID,
 				EventType:  EventTypePreRevert,
 				SourceRef:  branchID.Ref(),
@@ -2935,7 +2940,7 @@ func (g *Graveler) Revert(ctx context.Context, repository *RepositoryRecord, bra
 
 	if !repository.ReadOnly {
 		postRunID := g.hooks.NewRunID()
-		err = g.hooks.PostRevertHook(ctx, HookRecord{
+		g.runPostHook(ctx, HookRecord{
 			EventType:  EventTypePostRevert,
 			RunID:      postRunID,
 			Repository: repository,
@@ -2945,12 +2950,6 @@ func (g *Graveler) Revert(ctx context.Context, repository *RepositoryRecord, bra
 			CommitID:   newCommitID,
 			PreRunID:   preRunID,
 		})
-		if err != nil {
-			g.log(ctx).WithError(err).
-				WithField("run_id", postRunID).
-				WithField("pre_run_id", preRunID).
-				Error("Post-revert hook failed")
-		}
 	}
 
 	return newCommitID, nil
@@ -3043,7 +3042,7 @@ func (g *Graveler) CherryPick(ctx context.Context, repository *RepositoryRecord,
 
 		if !repository.ReadOnly {
 			preRunID = g.hooks.NewRunID()
-			err = g.hooks.PreCherryPickHook(ctx, HookRecord{
+			err = g.hooks.HandleHook(ctx, HookRecord{
 				RunID:      preRunID,
 				EventType:  EventTypePreCherryPick,
 				SourceRef:  branchID.Ref(),
@@ -3078,7 +3077,7 @@ func (g *Graveler) CherryPick(ctx context.Context, repository *RepositoryRecord,
 
 	if !repository.ReadOnly {
 		postRunID := g.hooks.NewRunID()
-		err = g.hooks.PostCherryPickHook(ctx, HookRecord{
+		g.runPostHook(ctx, HookRecord{
 			EventType:  EventTypePostCherryPick,
 			RunID:      postRunID,
 			Repository: repository,
@@ -3088,12 +3087,6 @@ func (g *Graveler) CherryPick(ctx context.Context, repository *RepositoryRecord,
 			CommitID:   commitID,
 			PreRunID:   preRunID,
 		})
-		if err != nil {
-			g.log(ctx).WithError(err).
-				WithField("run_id", postRunID).
-				WithField("pre_run_id", preRunID).
-				Error("Post-cherry-pick hook failed")
-		}
 	}
 
 	return commitID, nil
@@ -3204,7 +3197,7 @@ func (g *Graveler) Merge(ctx context.Context, repository *RepositoryRecord, dest
 		}
 		if !repository.ReadOnly {
 			preRunID = g.hooks.NewRunID()
-			err = g.hooks.PreMergeHook(ctx, HookRecord{
+			err = g.hooks.HandleHook(ctx, HookRecord{
 				EventType:   EventTypePreMerge,
 				RunID:       preRunID,
 				Repository:  repository,
@@ -3234,7 +3227,7 @@ func (g *Graveler) Merge(ctx context.Context, repository *RepositoryRecord, dest
 	g.dropTokens(ctx, tokensToDrop...)
 	if !repository.ReadOnly {
 		postRunID := g.hooks.NewRunID()
-		err = g.hooks.PostMergeHook(ctx, HookRecord{
+		g.runPostHook(ctx, HookRecord{
 			EventType:   EventTypePostMerge,
 			RunID:       postRunID,
 			Repository:  repository,
@@ -3245,13 +3238,6 @@ func (g *Graveler) Merge(ctx context.Context, repository *RepositoryRecord, dest
 			CommitID:    commitID,
 			PreRunID:    preRunID,
 		})
-		if err != nil {
-			g.log(ctx).
-				WithError(err).
-				WithField("run_id", postRunID).
-				WithField("pre_run_id", preRunID).
-				Error("Post-merge hook failed")
-		}
 	}
 	return commitID, nil
 }
@@ -3345,7 +3331,7 @@ func (g *Graveler) Import(ctx context.Context, repository *RepositoryRecord, des
 		commit.Metadata[MergeStrategyMetadataKey] = MergeStrategySrcWinsStr
 		if !repository.ReadOnly {
 			preRunID = g.hooks.NewRunID()
-			err = g.hooks.PreCommitHook(ctx, HookRecord{
+			err = g.hooks.HandleHook(ctx, HookRecord{
 				RunID:      preRunID,
 				EventType:  EventTypePreCommit,
 				SourceRef:  destination.Ref(),
@@ -3379,7 +3365,7 @@ func (g *Graveler) Import(ctx context.Context, repository *RepositoryRecord, des
 	g.dropTokens(ctx, tokensToDrop...)
 	if !repository.ReadOnly {
 		postRunID := g.hooks.NewRunID()
-		err = g.hooks.PostCommitHook(ctx, HookRecord{
+		g.runPostHook(ctx, HookRecord{
 			EventType:  EventTypePostCommit,
 			RunID:      postRunID,
 			Repository: repository,
@@ -3389,12 +3375,6 @@ func (g *Graveler) Import(ctx context.Context, repository *RepositoryRecord, des
 			CommitID:   commitID,
 			PreRunID:   preRunID,
 		})
-		if err != nil {
-			g.log(ctx).WithError(err).
-				WithField("run_id", postRunID).
-				WithField("pre_run_id", preRunID).
-				Error("Post-commit hook failed")
-		}
 	}
 
 	if err = g.retryRepoMetadataUpdate(ctx, repository, func(metadata RepositoryMetadata) (RepositoryMetadata, error) {
