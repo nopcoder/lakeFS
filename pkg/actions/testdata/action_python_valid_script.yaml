@@ -1,0 +1,9 @@
+name: python validation
+on:
+  pre-commit:
+hooks:
+  - id: python_hook
+    type: python
+    properties:
+      script: |
+        print("hello from python")

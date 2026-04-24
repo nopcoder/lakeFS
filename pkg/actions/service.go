@@ -37,6 +37,11 @@ type Config struct {
 	Lua     struct {
 		NetHTTPEnabled bool
 	}
+	Wasm struct {
+		Enabled          bool
+		Timeout          time.Duration
+		MemoryLimitPages uint32
+	}
 	Env struct {
 		Enabled bool
 		Prefix  string

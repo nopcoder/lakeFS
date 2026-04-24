@@ -1,0 +1,8 @@
+name: wasm missing module path
+on:
+  pre-commit:
+hooks:
+  - id: wasm_hook
+    type: wasm
+    properties:
+      script: print("hello")

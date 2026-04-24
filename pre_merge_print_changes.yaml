@@ -1,0 +1,42 @@
+name: pre-merge-print-changes
+on:
+  pre-merge:
+hooks:
+  - id: print_changes
+    type: python
+    properties:
+      script: |
+        import json
+
+        repo = action.get("repository_id")
+        source_ref = action.get("merge_source") or action.get("source_ref")
+        target_ref = action.get("branch_id")
+
+        if not repo or not source_ref or not target_ref:
+            lakefs.fail(
+                f"missing merge context repo={repo} source_ref={source_ref} target_ref={target_ref}"
+            )
+
+        print(f"pre-merge diff for repo={repo}: {source_ref} -> {target_ref}")
+
+        after = ""
+        total = 0
+
+        while True:
+            kwargs = {"after": after} if after else {}
+            #diff = lakefs.diff_refs(repo, source_ref, target_ref, **kwargs) or {}
+            diff = lakefs.diff_refs(repo, target_ref, source_ref, **kwargs) or {}
+
+            for change in diff.get("results", []):
+                print(json.dumps(change, sort_keys=True))
+                total += 1
+
+            pagination = diff.get("pagination", {}) or {}
+            if not pagination.get("has_more"):
+                break
+
+            after = pagination.get("next_offset", "")
+            if not after:
+                break
+
+        print(f"total changes: {total}")

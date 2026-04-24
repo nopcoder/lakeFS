@@ -80,6 +80,10 @@ type loggingBuffer struct {
 	ctx context.Context
 }
 
+func (l *loggingBuffer) Write(p []byte) (n int, err error) {
+	return l.WriteString(string(p))
+}
+
 func (l *loggingBuffer) WriteString(s string) (n int, err error) {
 	logging.FromContext(l.ctx).WithField("hook_driver", "lua").WithField("hook_output", s).Trace("lua output captured")
 	return l.buf.WriteString(s)

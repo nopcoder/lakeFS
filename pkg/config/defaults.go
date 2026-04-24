@@ -60,6 +60,7 @@ func setBaseDefaults(cfgType string) {
 	SetLoggingDefaults()
 
 	viper.SetDefault("actions.enabled", true)
+	viper.SetDefault("actions.wasm.enabled", true)
 	viper.SetDefault("actions.env.enabled", true)
 	viper.SetDefault("actions.env.prefix", "LAKEFSACTION_")
 

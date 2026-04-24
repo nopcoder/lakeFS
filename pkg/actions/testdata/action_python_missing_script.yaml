@@ -1,0 +1,9 @@
+name: python missing script
+on:
+  pre-commit:
+hooks:
+  - id: python_hook
+    type: python
+    properties:
+      args:
+        key: val

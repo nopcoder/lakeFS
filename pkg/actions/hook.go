@@ -18,6 +18,8 @@ const (
 	HookTypeWebhook HookType = "webhook"
 	HookTypeAirflow HookType = "airflow"
 	HookTypeLua     HookType = "lua"
+	HookTypeWASM    HookType = "wasm"
+	HookTypePython  HookType = "python"
 )
 
 // Hook is the abstraction of the basic user-configured runnable building-stone
@@ -60,12 +62,16 @@ var hooks = map[HookType]NewHookFunc{
 	HookTypeWebhook: NewWebhook,
 	HookTypeAirflow: NewAirflowHook,
 	HookTypeLua:     NewLuaHook,
+	HookTypeWASM:    NewWasmHook,
+	HookTypePython:  NewPythonHook,
 }
 
 var hookValidators = map[HookType]ValidatePropertiesFunc{
 	HookTypeWebhook: requireProperties([]string{"url"}),
 	HookTypeAirflow: requireProperties([]string{"url"}, []string{"dag_id"}, []string{"username"}, []string{"password"}),
 	HookTypeLua:     requireProperties([]string{"script", "script_path"}),
+	HookTypeWASM:    requireProperties([]string{"module_path"}),
+	HookTypePython:  requireProperties([]string{"script", "script_path"}),
 }
 
 func NewHook(hook ActionHook, action *Action, cfg Config, server *http.Server, serverAddress string, collector stats.Collector) (Hook, error) {

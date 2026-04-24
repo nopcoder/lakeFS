@@ -467,6 +467,11 @@ type BaseConfig struct {
 		Lua     struct {
 			NetHTTPEnabled bool `mapstructure:"net_http_enabled"`
 		} `mapstructure:"lua"`
+		Wasm struct {
+			Enabled          bool          `mapstructure:"enabled"`
+			Timeout          time.Duration `mapstructure:"timeout"`
+			MemoryLimitPages uint32        `mapstructure:"memory_limit_pages"`
+		} `mapstructure:"wasm"`
 		Env struct {
 			Enabled bool   `mapstructure:"enabled"`
 			Prefix  string `mapstructure:"prefix"`

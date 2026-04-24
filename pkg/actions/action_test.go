@@ -37,6 +37,10 @@ func TestAction_ReadAction(t *testing.T) {
 		{name: "lua no properties", filename: "action_lua_no_properties.yaml", errStr: "missing hook properties"},
 		{name: "lua valid script", filename: "action_lua_valid_script.yaml"},
 		{name: "lua valid script_path", filename: "action_lua_valid_script_path.yaml"},
+		{name: "python missing script", filename: "action_python_missing_script.yaml", errStr: "'script' or 'script_path' must be supplied in properties"},
+		{name: "python valid script", filename: "action_python_valid_script.yaml"},
+		{name: "wasm missing module_path", filename: "action_wasm_missing_module_path.yaml", errStr: "'module_path' must be supplied in properties"},
+		{name: "wasm valid module_path", filename: "action_wasm_valid_module_path.yaml"},
 		{name: "webhook missing url", filename: "action_webhook_missing_url.yaml", errStr: "'url' must be supplied in properties"},
 		{name: "airflow missing props", filename: "action_airflow_missing_props.yaml", errStr: "'dag_id' must be supplied in properties"},
 	}

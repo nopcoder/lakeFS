@@ -1,0 +1,8 @@
+name: wasm validation
+on:
+  pre-commit:
+hooks:
+  - id: wasm_hook
+    type: wasm
+    properties:
+      module_path: hooks/check.wasm
