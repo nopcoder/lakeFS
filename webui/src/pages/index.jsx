@@ -5,6 +5,7 @@ import { WithLoginConfigContext } from '../lib/hooks/conf';
 
 // pages
 import RepositoriesPage from './repositories';
+import DatasetsPage from './datasets';
 import { RepositoryPageLayout } from '../lib/components/repository/layout.jsx';
 import RepositoryObjectsPage from './repositories/repository/objects';
 import RepositoryObjectsViewPage from './repositories/repository/objectViewer';
@@ -36,7 +37,7 @@ import UserCredentialsPage from './auth/users/user/credentials';
 import PoliciesPage from './auth/policies';
 import PolicyPage from './auth/policies/policy';
 import LoginPage from './auth/login';
-import ActivateInvitedUserPage from './auth/users/create-user-with-password';
+import ActivateInvitedUserPage from './auth/users/createUserWithPassword';
 import Setup from './setup';
 import { AuthLayout } from '../lib/components/auth/layout';
 import RepositoryActionPage from './repositories/repository/actions/run';
@@ -97,6 +98,9 @@ export const IndexPage = () => {
                                         </Route>
                                         <Route index element={<Navigate to="objects" />} />
                                     </Route>
+                                </Route>
+                                <Route path="datasets" element={<Layout />}>
+                                    <Route index element={<DatasetsPage />} />
                                 </Route>
                                 <Route path="auth" element={<Layout />}>
                                     <Route index element={<Navigate to="credentials" replace />} />

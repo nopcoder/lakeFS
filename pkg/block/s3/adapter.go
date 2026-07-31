@@ -30,7 +30,12 @@ import (
 	"github.com/treeverse/lakefs/pkg/block/params"
 	"github.com/treeverse/lakefs/pkg/logging"
 	"github.com/treeverse/lakefs/pkg/stats"
+	"github.com/treeverse/lakefs/pkg/version"
 )
+
+// userAgentProduct is the lakeFS product token added to the S3 User-Agent
+// (RFC 9110 product form: `lakefs/<version>`).
+const userAgentProduct = "lakefs"
 
 var (
 	ErrS3          = errors.New("s3 error")
@@ -145,6 +150,9 @@ func LoadConfig(ctx context.Context, params params.S3) (aws.Config, error) {
 	opts = append(opts,
 		config.WithRequestChecksumCalculation(aws.RequestChecksumCalculationWhenRequired),
 		config.WithResponseChecksumValidation(aws.ResponseChecksumValidationWhenRequired),
+		config.WithAPIOptions([]func(*middleware.Stack) error{
+			awsmiddleware.AddUserAgentKeyValue(userAgentProduct, version.Version),
+		}),
 	)
 
 	opts = append(opts, config.WithLogger(&logging.AWSAdapter{
@@ -956,7 +964,8 @@ func (a *Adapter) managerUpload(ctx context.Context, obj block.ObjectPointer, re
 	}
 
 	client := a.clients.Get(ctx, bucket)
-	uploader := manager.NewUploader(client)
+	// feature/s3/transfermanager, the suggested replacement, is still a v0.x developer preview.
+	uploader := manager.NewUploader(client) //nolint:staticcheck // transfermanager not yet GA
 	input := &s3.PutObjectInput{
 		Bucket: aws.String(bucket),
 		Key:    aws.String(key),
@@ -972,7 +981,7 @@ func (a *Adapter) managerUpload(ctx context.Context, obj block.ObjectPointer, re
 		input.SSEKMSKeyId = aws.String(a.ServerSideEncryptionKmsKeyID)
 	}
 
-	output, err := uploader.Upload(ctx, input)
+	output, err := uploader.Upload(ctx, input) //nolint:staticcheck // transfermanager not yet GA
 	if err != nil {
 		return err
 	}

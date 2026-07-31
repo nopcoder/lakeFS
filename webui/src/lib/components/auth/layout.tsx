@@ -34,15 +34,11 @@ export const AuthLayout = () => {
                             }}
                         >
                             <InfoIcon /> Enhance Your Security with{' '}
-                            <Alert.Link href={'https://community.lakefs.io/reference/security/rbac.html'}>
+                            <Alert.Link href={'https://docs.lakefs.io/security/rbac/'}>
                                 Role-Based Access Control
                             </Alert.Link>{' '}
                             – Available on <Alert.Link href={'https://lakefs.cloud/register'}>lakeFS Cloud</Alert.Link>{' '}
-                            and{' '}
-                            <Alert.Link href={'https://community.lakefs.io/understand/enterprise/'}>
-                                lakeFS Enterprise
-                            </Alert.Link>
-                            !
+                            and <Alert.Link href={'https://docs.lakefs.io/enterprise/'}>lakeFS Enterprise</Alert.Link>!
                         </Alert>
                     )}
                 </div>
@@ -57,7 +53,6 @@ export const AuthLayout = () => {
                                     component={Nav.Link}
                                     href="/auth/credentials"
                                     active={activeTab === 'credentials'}
-                                    disabled={rbac === 'none'}
                                 >
                                     My Credentials
                                 </Link>
@@ -66,30 +61,15 @@ export const AuthLayout = () => {
                             <hr />
 
                             <Nav variant="pills" className="flex-column">
-                                <Link
-                                    component={Nav.Link}
-                                    href="/auth/users"
-                                    active={activeTab === 'users'}
-                                    disabled={rbac === 'none'}
-                                >
+                                <Link component={Nav.Link} href="/auth/users" active={activeTab === 'users'}>
                                     Users
                                 </Link>
 
-                                <Link
-                                    component={Nav.Link}
-                                    href="/auth/groups"
-                                    active={activeTab === 'groups'}
-                                    disabled={rbac === 'none'}
-                                >
+                                <Link component={Nav.Link} href="/auth/groups" active={activeTab === 'groups'}>
                                     Groups
                                 </Link>
-                                {rbac !== 'simplified' && rbac !== 'none' && (
-                                    <Link
-                                        component={Nav.Link}
-                                        href="/auth/policies"
-                                        active={activeTab === 'policies'}
-                                        disabled={rbac === 'none'}
-                                    >
+                                {rbac !== 'simplified' && (
+                                    <Link component={Nav.Link} href="/auth/policies" active={activeTab === 'policies'}>
                                         Policies
                                     </Link>
                                 )}
@@ -98,26 +78,7 @@ export const AuthLayout = () => {
                     </Card>
                 </Col>
                 <Col md={{ span: 9 }}>
-                    {rbac === 'none' ? (
-                        <div>
-                            <Alert variant="info" title="rbac CTA">
-                                <p>
-                                    <InfoIcon /> <b>Role-based access control not configured.</b>
-                                </p>
-                                This feature is enabled on{' '}
-                                <Alert.Link href={'https://lakefs.cloud/register'}>lakeFS Cloud</Alert.Link> and{' '}
-                                <Alert.Link href={'https://community.lakefs.io/understand/enterprise/'}>
-                                    lakeFS Enterprise
-                                </Alert.Link>
-                                .{' '}
-                                <Alert.Link href={'https://lakefs.io/blog/why-moving-acls-out-of-core-lakefs/'}>
-                                    Learn More
-                                </Alert.Link>
-                            </Alert>
-                        </div>
-                    ) : (
-                        <Outlet context={[setActiveTab] satisfies AuthOutletContext} />
-                    )}
+                    <Outlet context={[setActiveTab] satisfies AuthOutletContext} />
                 </Col>
             </Row>
         </Container>

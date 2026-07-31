@@ -47,7 +47,7 @@ const (
 `
 	getLatestVersionErrorTemplate = `{{ "Failed getting latest lakectl version:" | red }} {{ . }}
 `
-	versionTemplate = `lakectl version: {{.LakectlVersion }}
+	versionTemplate = `lakectl version: {{.LakectlVersion }}{{ if .Distribution }} ({{.Distribution}}){{ end }}
 {{- if .LakeFSVersion }}
 lakeFS version: {{.LakeFSVersion}}
 {{- end }}
@@ -121,6 +121,7 @@ type Configuration struct {
 
 type versionInfo struct {
 	LakectlVersion       string
+	Distribution         string
 	LakeFSVersion        string
 	LakectlLatestVersion string
 	LakeFSLatestVersion  string
@@ -157,7 +158,6 @@ var (
 const (
 	recursiveFlagName     = "recursive"
 	recursiveFlagShort    = "r"
-	storageIDFlagName     = "storage-id"
 	presignFlagName       = "pre-sign"
 	parallelismFlagName   = "parallelism"
 	noProgressBarFlagName = "no-progress"
@@ -207,13 +207,6 @@ var (
 
 func withRecursiveFlag(cmd *cobra.Command, usage string) {
 	cmd.Flags().BoolP(recursiveFlagName, recursiveFlagShort, false, usage)
-}
-
-func withStorageID(cmd *cobra.Command) {
-	cmd.Flags().String(storageIDFlagName, "", "")
-	if err := cmd.Flags().MarkHidden(storageIDFlagName); err != nil {
-		DieErr(err)
-	}
 }
 
 func withParallelismFlag(cmd *cobra.Command) {
@@ -448,7 +441,7 @@ It can be extended with plugins; see 'lakectl plugin --help' for more informatio
 			return
 		}
 
-		info := versionInfo{LakectlVersion: version.Version}
+		info := versionInfo{LakectlVersion: version.Version, Distribution: version.Distribution}
 
 		// get lakeFS server version
 
@@ -622,7 +615,7 @@ func newAWSIAMAuthProviderConfig() (*awsiam.IAMAuthParams, error) {
 	return awsiam.NewIAMAuthParams(host, opts...), nil
 }
 
-func getClient(opts ...apigen.ClientOption) *apigen.ClientWithResponses {
+func getClient() *apigen.ClientWithResponses {
 	httpClient := getHTTPClient(lakectlRetryPolicy)
 	accessKeyID := cfg.Credentials.AccessKeyID
 	secretAccessKey := cfg.Credentials.SecretAccessKey
@@ -639,9 +632,10 @@ func getClient(opts ...apigen.ClientOption) *apigen.ClientWithResponses {
 		DieErr(err)
 	}
 
+	var opts []apigen.ClientOption
 	useJWTAuth := accessKeyID == "" && secretAccessKey == ""
 	if useJWTAuth {
-		opts = append(getClientOptions(awsIAMparams, serverEndpoint), opts...)
+		opts = getClientOptions(awsIAMparams, serverEndpoint)
 	}
 
 	oss := osinfo.GetOSInfo()
@@ -699,7 +693,7 @@ func CreateTokenCacheCallback() awsiam.TokenCacheCallback {
 	return func(newToken *apigen.AuthenticationToken) {
 		cachedToken = newToken
 		if err := SaveTokenToCache(); err != nil {
-			logging.ContextUnavailable().Debugf("error saving token to cache: %w", err)
+			logging.ContextUnavailable().Debugf("error saving token to cache: %v", err)
 		}
 	}
 }
@@ -755,7 +749,7 @@ func getTokenOnce() *apigen.AuthenticationToken {
 				cachedToken = token
 				return
 			}
-			logging.ContextUnavailable().Debugf("Error loading token from cache: %w", err)
+			logging.ContextUnavailable().Debugf("Error loading token from cache: %v", err)
 		}
 	})
 	return cachedToken
@@ -765,11 +759,11 @@ func getTokenCacheOnce() *awsiam.JWTCache {
 	tokenCacheOnce.Do(func() {
 		homeDir, err := os.UserHomeDir()
 		if err != nil {
-			logging.ContextUnavailable().Debugf("Error getting user homedir: %w", err)
+			logging.ContextUnavailable().Debugf("Error getting user homedir: %v", err)
 		}
 		cache, err := awsiam.NewJWTCache(homeDir, LakectlDirName, CacheDirName, CacheFileName)
 		if err != nil {
-			logging.ContextUnavailable().Debugf("Error creating token cache: %w", err)
+			logging.ContextUnavailable().Debugf("Error creating token cache: %v", err)
 			tokenCache = nil
 		} else {
 			tokenCache = cache

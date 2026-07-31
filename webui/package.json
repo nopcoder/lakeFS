@@ -53,6 +53,7 @@
     "react-syntax-highlighter": "^15.5.0",
     "rehype-raw": "^7.0.0",
     "rehype-react": "^8.0.0",
+    "rehype-sanitize": "^6.0.0",
     "rehype-wrap": "^1.1.0",
     "remark": "^14.0.2",
     "remark-gfm": "^4.0.0",
@@ -92,6 +93,7 @@
     "dotenv": "^16.3.1",
     "eslint": "^9.39.2",
     "eslint-config-prettier": "^10.1.8",
+    "eslint-plugin-check-file": "^3.3.1",
     "eslint-plugin-compat": "^6.1.0",
     "eslint-plugin-prettier": "^5.5.4",
     "eslint-plugin-react": "^7.33.2",
@@ -109,5 +111,11 @@
     "vite": "^7.3.1",
     "vite-plugin-eslint2": "^5.0.4",
     "vitest": "^3.2.4"
+  },
+  "allowScripts": {
+    "@parcel/watcher": true,
+    "@swc/core": true,
+    "esbuild": true,
+    "fsevents": true
   }
 }

@@ -27,6 +27,8 @@ import { resolveUserDisplayName } from '../../../lib/utils';
 import { allUsersFromLakeFS } from '../../../lib/components/auth/users';
 import { useRouter } from '../../../lib/hooks/router';
 import { useAuth } from '../../../lib/auth/authContext';
+import { useLoginConfigContext } from '../../../lib/hooks/conf';
+import { FeatureLockedEmptyState } from '../../../lib/components/auth/enterpriseUpgrade';
 
 const DEFAULT_LISTING_AMOUNT = 100;
 const DECIMAL_RADIX = 10;
@@ -113,11 +115,7 @@ const UsersContainer = ({ refresh, setRefresh, allUsers, loading, error }) => {
             </ActionsBar>
             <div className="auth-learn-more">
                 Users are entities that access and use lakeFS.{' '}
-                <a
-                    href="https://community.lakefs.io/reference/authentication.html"
-                    target="_blank"
-                    rel="noopener noreferrer"
-                >
+                <a href="https://docs.lakefs.io/security/authentication/" target="_blank" rel="noopener noreferrer">
                     Learn more.
                 </a>
             </div>
@@ -220,16 +218,19 @@ export const UsersPage = () => {
 const UsersIndexPage = () => {
     const [setActiveTab] = useOutletContext();
     const [refresh, setRefresh] = useState(false);
+    const { RBAC: rbac } = useLoginConfigContext();
+    const rbacDisabled = rbac === 'none';
 
     const {
         response: allUsers,
         loading,
         error,
     } = useAPI(() => {
+        if (rbacDisabled) return Promise.resolve([]);
         return allUsersFromLakeFS(resolveUserDisplayName);
         // TODO: Review and remove this eslint-disable once dependencies are validated
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [refresh]);
+    }, [refresh, rbacDisabled]);
 
     const getUserDisplayNameById = useCallback(
         (id) => {
@@ -244,6 +245,16 @@ const UsersIndexPage = () => {
         },
         [allUsers],
     );
+
+    useEffect(() => {
+        if (rbacDisabled) {
+            setActiveTab('users');
+        }
+    }, [rbacDisabled, setActiveTab]);
+
+    if (rbacDisabled) {
+        return <FeatureLockedEmptyState feature="users" />;
+    }
 
     return (
         <GetUserDisplayNameByIdContext.Provider value={getUserDisplayNameById}>

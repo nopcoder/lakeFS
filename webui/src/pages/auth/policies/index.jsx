@@ -24,6 +24,7 @@ import { useRouter } from '../../../lib/hooks/router';
 import { useLoginConfigContext } from '../../../lib/hooks/conf';
 import { Link } from '../../../lib/components/nav';
 import { disallowPercentSign, INVALID_POLICY_ID_ERROR_MESSAGE } from '../validation';
+import { FeatureLockedEmptyState } from '../../../lib/components/auth/enterpriseUpgrade';
 
 const PoliciesContainer = () => {
     const [selected, setSelected] = useState([]);
@@ -93,13 +94,13 @@ const PoliciesContainer = () => {
                     <b>Deprecation Notice:</b> RBAC (Role-Based Access Control) is being deprecated and will be replaced
                     by ACL (Access Control Lists) in future releases. For more information on the transition from RBAC
                     to ACL, please visit our{' '}
-                    <a href="https://community.lakefs.io/posts/security_update.html">documentation page</a>.
+                    <a href="https://docs.lakefs.io/posts/security_update/">documentation page</a>.
                 </Warning>
             )}
             <div className="auth-learn-more">
                 A policy defines the permissions of a user or a group.{' '}
                 <a
-                    href="https://community.lakefs.io/reference/authorization.html#authorization"
+                    href="https://docs.lakefs.io/reference/authorization/oss/#authorization"
                     target="_blank"
                     rel="noopener noreferrer"
                 >
@@ -166,7 +167,11 @@ const PoliciesContainer = () => {
 
 const PoliciesPage = () => {
     const [setActiveTab] = useOutletContext();
+    const { RBAC: rbac } = useLoginConfigContext();
     useEffect(() => setActiveTab('policies'), [setActiveTab]);
+    if (rbac === 'none') {
+        return <FeatureLockedEmptyState feature="policies" />;
+    }
     return <PoliciesContainer />;
 };
 

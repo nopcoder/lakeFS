@@ -8,6 +8,8 @@ import { CredentialsShowModal, CredentialsTable } from '../../lib/components/aut
 import { useRouter } from '../../lib/hooks/router';
 import { resolveUserDisplayName } from '../../lib/utils';
 import { useAuth } from '../../lib/auth/authContext';
+import { useLoginConfigContext } from '../../lib/hooks/conf';
+import { FeatureLockedEmptyState } from '../../lib/components/auth/enterpriseUpgrade';
 
 const CredentialsContainer = () => {
     const router = useRouter();
@@ -60,7 +62,7 @@ const CredentialsContainer = () => {
             <div className="auth-learn-more">
                 An access key-pair is the set of credentials used to access lakeFS.{' '}
                 <a
-                    href="https://community.lakefs.io/reference/authorization.html#authentication"
+                    href="https://docs.lakefs.io/reference/authorization/oss/#authentication"
                     target="_blank"
                     rel="noopener noreferrer"
                 >
@@ -98,7 +100,11 @@ const CredentialsContainer = () => {
 
 const CredentialsPage = () => {
     const [setActiveTab] = useOutletContext();
+    const { RBAC: rbac } = useLoginConfigContext();
     useEffect(() => setActiveTab('credentials'), [setActiveTab]);
+    if (rbac === 'none') {
+        return <FeatureLockedEmptyState feature="credentials" />;
+    }
     return <CredentialsContainer />;
 };
 

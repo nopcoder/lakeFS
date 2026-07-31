@@ -13,6 +13,7 @@ import './styles/objects/upload.css';
 import './styles/objects/tree.css';
 import './styles/objects/diff.css';
 import './styles/auth.css';
+import './styles/datasets.css';
 // Components
 import './styles/components/buttons.css';
 import './styles/components/cards.css';
@@ -23,14 +24,10 @@ import './styles/components/bootstrap-compat.css';
 import './styles/quickstart.css';
 import './styles/ghsyntax.css';
 
-// app and plugins system
-import LakeFSApp from './extendable/lakefsApp';
-import { PluginManager } from './extendable/plugins/pluginManager';
-
-const pluginManager = new PluginManager();
+import { IndexPage } from './pages';
 
 const container = document.getElementById('root');
 if (!container) throw new Error('Failed to find root element!');
 
 const root = createRoot(container);
-root.render(<LakeFSApp pluginManager={pluginManager} />);
+root.render(<IndexPage />);
